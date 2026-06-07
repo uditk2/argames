@@ -104,7 +104,7 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
         setStatus('ready');
         startDemoInput(bus, game);
       } else {
-        await startPoseInput(bus);
+        await startPoseInput(bus, game);
       }
 
       // 5) Start the game + main loop
@@ -162,7 +162,7 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
     }
 
     // --- Real camera + pose pipeline ---
-    async function startPoseInput(bus) {
+    async function startPoseInput(bus, game) {
       try {
         setStatus('starting');
         stream = await startCamera(videoRef.current);

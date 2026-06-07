@@ -92,6 +92,12 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
     antialias: true,
     autoDensity: true,
     resolution: window.devicePixelRatio || 1,
+    // The instant-replay compositor (recording/replayBuffer.js) reads this
+    // canvas via drawImage() from its OWN rAF loop, outside Pixi's render tick.
+    // A WebGL canvas only yields pixels to drawImage() outside its draw cycle
+    // when the drawing buffer is preserved — without this the replay captures a
+    // blank FX layer (demons/energy never appear in the clip).
+    preserveDrawingBuffer: true,
   });
   mount.appendChild(app.canvas);
 
