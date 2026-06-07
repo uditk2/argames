@@ -12,7 +12,7 @@ export default function ReplayCard({ supported }) {
         </span>
       </div>
       <div className="flex gap-1 px-1.5 sm:px-2 pb-1.5 sm:pb-2 relative">
-        <div className="flex-1 h-[44px] sm:h-[84px] rounded-lg relative overflow-hidden bg-[radial-gradient(60%_70%_at_50%_40%,rgba(176,121,255,.55),#1a0c30_75%)]">
+        <div className="flex-1 h-[44px] sm:h-[84px] rounded-lg relative overflow-hidden bg-[radial-gradient(60%_70%_at_50%_40%,rgb(var(--magic-rgb)/.55),#1a0c30_75%)]">
           <span className="absolute bottom-0.5 left-1 text-[8px] sm:text-[10px] tracking-wider uppercase text-white/85">Realm</span>
         </div>
         <div className="flex-1 h-[44px] sm:h-[84px] rounded-lg relative overflow-hidden bg-[radial-gradient(70%_80%_at_50%_120%,rgba(87,227,255,.3),#10202c_70%)]">

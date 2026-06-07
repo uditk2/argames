@@ -7,19 +7,27 @@
 // consumes a finished clip ({ blob, ... }) and stats; it never touches the
 // game canvas or camera directly.
 //
-//   shareReplay(clip, stats)         -> share/download the 10s WebM clip
+//   shareReplay(clip, stats)         -> share/download the instant-replay clip
 //   shareScoreCard(stats, opts)      -> build + share/download the PNG card
 //   buildScoreCard(stats, opts)      -> just build the PNG ({ blob, url, ... })
 //
-// FORMAT NOTE: replay clips are WebM (broad MediaRecorder support). Instagram /
-// TikTok prefer MP4 — an MP4 transcode is a known follow-up.
+// TWO SHARE PATHS, by medium:
+//   • Media files (replay clip, PNG card) -> Web Share sheet / download here, so
+//     users can post the actual file into mobile apps (Instagram/TikTok/X). The
+//     clip is already MP4 where the platform can record it (see replayBuffer.js).
+//   • X / Facebook / LinkedIn -> can't take a local file; they read OG tags off
+//     a public URL. socialShare.js points them at our /s page whose og:image is
+//     the dynamic /api/og card. No upload, no storage.
 // ===========================================================================
 
 import { buildScoreCard } from './scoreCard.js';
 import { shareFile } from './share.js';
+import { BRAND, BRAND_SLUG } from '../config/brand.js';
 import { shared as gaShared } from '../analytics/ga.js';
 
 export { buildScoreCard };
+// Per-network sharing (X / Facebook / LinkedIn / copy link) via the /s OG page.
+export { buildShareUrl, shareText, openSocialShare, copyShareLink } from './socialShare.js';
 
 function slug() {
   const d = new Date();
@@ -42,12 +50,12 @@ function extForMime(mime) {
 export async function shareReplay(clip, stats = {}) {
   if (!clip || !clip.blob) return { method: 'unsupported' };
   const ext = extForMime(clip.mime || clip.blob.type);
-  const filename = `demon-realm-replay-${slug()}.${ext}`;
-  const text = `I scored ${(stats.score ?? 0).toLocaleString()} in Demon Realm — last 10 seconds of the fight.`;
+  const filename = `${BRAND_SLUG}-replay-${slug()}.${ext}`;
+  const text = `I scored ${(stats.score ?? 0).toLocaleString()} in ${BRAND.name} — last 10 seconds of the fight.`;
   const res = await shareFile({
     blob: clip.blob,
     filename,
-    title: 'Demon Realm — Instant Replay',
+    title: `${BRAND.name} — Instant Replay`,
     text,
   });
   gaShared({ kind: 'replay', method: res.method });
@@ -63,12 +71,12 @@ export async function shareReplay(clip, stats = {}) {
  */
 export async function shareScoreCard(stats = {}, opts = {}) {
   const card = opts.card || (await buildScoreCard(stats, opts));
-  const filename = `demon-realm-score-${slug()}.png`;
-  const text = `I cleared the Demon Realm with ${(stats.score ?? 0).toLocaleString()} points & ${stats.slain ?? 0} demons slain!`;
+  const filename = `${BRAND_SLUG}-score-${slug()}.png`;
+  const text = `I cleared ${BRAND.name} with ${(stats.score ?? 0).toLocaleString()} points & ${stats.slain ?? 0} demons slain!`;
   const res = await shareFile({
     blob: card.blob,
     filename,
-    title: 'Demon Realm — Score',
+    title: `${BRAND.name} — Score`,
     text,
   });
   gaShared({ kind: 'scorecard', method: res.method });

@@ -22,6 +22,7 @@ import { timerProgress } from '../../engine/timer.js';
 import Timer from '../hud/Timer.jsx';
 import ScorePanel from '../hud/ScorePanel.jsx';
 import ComboMeter from '../hud/ComboMeter.jsx';
+import { BRAND } from '../../config/brand.js';
 
 // Landmarks that must all be in-frame for the player to count as "fully visible
 // to the knees": nose, both shoulders, both hips, both knees. (MediaPipe Pose.)
@@ -370,7 +371,7 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
   }, []);
 
   return (
-    <div className="relative w-full h-full overflow-hidden bg-[#0a0510]">
+    <div className="relative w-full h-full overflow-hidden bg-realm">
       {/* LIVE PLAYER LAYER (behind the transparent Pixi canvas).
           The mirrored webcam IS the fighter; the Pixi canvas overlays the
           glowing pose-tracked energy effects on top of it. */}
@@ -384,7 +385,7 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
       ) : (
         // Demo: no camera — tasteful dim silhouette so the "live" feel still
         // reads while the simulated energy fists move on top.
-        <div className="absolute inset-0 z-0 flex items-end justify-center bg-[radial-gradient(70%_80%_at_50%_115%,rgba(154,76,255,.18),transparent_70%)]">
+        <div className="absolute inset-0 z-0 flex items-end justify-center bg-[radial-gradient(70%_80%_at_50%_115%,rgb(var(--magic-rgb)/.18),transparent_70%)]">
           <svg className="h-[78%] opacity-30" viewBox="0 0 70 92" preserveAspectRatio="xMidYMax meet">
             <g fill="rgba(180,160,255,.9)">
               <circle cx="35" cy="22" r="15" />
@@ -401,8 +402,8 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
       <div className="absolute inset-0 z-10">
         {/* Brand */}
         <div className="absolute top-2 left-3 sm:top-4 sm:left-5">
-          <div className="font-display font-black text-sm sm:text-lg bg-gradient-to-b from-[#ffe7a8] to-[#ff8c3c] bg-clip-text text-transparent">
-            DEMON REALM
+          <div className="font-display font-black text-sm sm:text-lg bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">
+            {BRAND.wordmark}
           </div>
           <div className="hidden sm:block text-[10px] tracking-[0.24em] text-magic/70">
             {Math.round(settings.durationSec / 60)}-MINUTE ONSLAUGHT
@@ -429,7 +430,7 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
                 preserveAspectRatio="xMidYMid meet"
               >
                 <g
-                  stroke={calib.ok ? '#7dffa0' : '#b079ff'}
+                  stroke={calib.ok ? '#7dffa0' : 'var(--magic)'}
                   strokeWidth="1.4"
                   strokeLinecap="round"
                   strokeDasharray="4 3"

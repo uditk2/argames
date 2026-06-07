@@ -7,19 +7,23 @@
 // missing asset). Palette matches the app: purple magic + fire-orange on dark.
 // ===========================================================================
 
+import { rgba } from '../config/theme.js';
+import { BRAND } from '../config/brand.js';
+
 const CARD_W = 1080;
 const CARD_H = 1350;
 
-// Palette (mirrors tailwind.config.js / the in-app look).
+// Palette reads from the shared theme (src/config/theme.js -> CSS variables),
+// so the share card retints with the rest of the app from one source.
 const COLORS = {
   realm: '#0a0510',
   realm2: '#160a26',
-  magic: '#9a4cff',
-  magicLight: '#b079ff',
-  fire: '#ff6a2c',
+  magic: rgba.magic(),
+  magicLight: rgba.magic(),
+  fire: rgba.fire(),
   fireBright: '#ff8c3c',
-  gold: '#ffe7a8',
-  ink: '#e8e0ff',
+  gold: rgba.gold(),
+  ink: rgba.ink(),
 };
 
 const DEFAULT_BG = '/assets/backgrounds/Cloudy_Sky-Night_01-1024x512.png';
@@ -66,7 +70,7 @@ function roundRect(ctx, x, y, w, h, r) {
  * @returns {Promise<{ blob: Blob, url: string, width:number, height:number }>}
  */
 export async function buildScoreCard(stats = {}, opts = {}) {
-  const title = opts.title || 'DEMON REALM';
+  const title = opts.title || BRAND.wordmark;
   const canvas = document.createElement('canvas');
   canvas.width = CARD_W;
   canvas.height = CARD_H;
@@ -84,9 +88,9 @@ export async function buildScoreCard(stats = {}, opts = {}) {
     ctx.restore();
   }
 
-  // Vertical mood gradient (purple top -> deep dark bottom).
+  // Vertical mood gradient (warm top -> deep dark bottom).
   const grad = ctx.createLinearGradient(0, 0, 0, CARD_H);
-  grad.addColorStop(0, 'rgba(90,30,110,0.55)');
+  grad.addColorStop(0, 'rgba(92,54,18,0.55)');
   grad.addColorStop(0.5, 'rgba(16,8,30,0.78)');
   grad.addColorStop(1, 'rgba(8,4,16,0.96)');
   ctx.fillStyle = grad;
@@ -101,8 +105,8 @@ export async function buildScoreCard(stats = {}, opts = {}) {
 
   // Magic glow from the top.
   const magicGlow = ctx.createRadialGradient(CARD_W / 2, -CARD_H * 0.05, 60, CARD_W / 2, -CARD_H * 0.05, CARD_H * 0.7);
-  magicGlow.addColorStop(0, 'rgba(154,76,255,0.4)');
-  magicGlow.addColorStop(1, 'rgba(154,76,255,0)');
+  magicGlow.addColorStop(0, rgba.magic(0.4));
+  magicGlow.addColorStop(1, rgba.magic(0));
   ctx.fillStyle = magicGlow;
   ctx.fillRect(0, 0, CARD_W, CARD_H);
 
@@ -137,13 +141,13 @@ export async function buildScoreCard(stats = {}, opts = {}) {
   ctx.fillText(title, cx, 220);
   ctx.restore();
 
-  ctx.fillStyle = 'rgba(176,121,255,0.85)';
+  ctx.fillStyle = rgba.magic(0.85);
   ctx.font = '600 34px Arial, sans-serif';
   ctx.fillText('R E A L M   C L E A R E D', cx, 285);
 
   // --- Hero score ---
   ctx.save();
-  ctx.shadowColor = 'rgba(154,76,255,0.7)';
+  ctx.shadowColor = rgba.magic(0.7);
   ctx.shadowBlur = 40;
   ctx.fillStyle = '#ffffff';
   ctx.font = '900 280px Georgia, serif';
@@ -151,7 +155,7 @@ export async function buildScoreCard(stats = {}, opts = {}) {
   ctx.fillText(scoreText, cx, 600);
   ctx.restore();
 
-  ctx.fillStyle = 'rgba(232,224,255,0.7)';
+  ctx.fillStyle = rgba.ink(0.7);
   ctx.font = '600 40px Arial, sans-serif';
   ctx.fillText('SCORE', cx, 670);
 
@@ -173,7 +177,7 @@ export async function buildScoreCard(stats = {}, opts = {}) {
     roundRect(ctx, x, tileY, tileW, tileH, 28);
     ctx.fill();
     ctx.lineWidth = 2;
-    ctx.strokeStyle = 'rgba(154,76,255,0.35)';
+    ctx.strokeStyle = rgba.magic(0.35);
     ctx.stroke();
     ctx.restore();
 
@@ -182,7 +186,7 @@ export async function buildScoreCard(stats = {}, opts = {}) {
     ctx.textAlign = 'center';
     ctx.fillText(t.value, x + tileW / 2, tileY + 130);
 
-    ctx.fillStyle = 'rgba(232,224,255,0.65)';
+    ctx.fillStyle = rgba.ink(0.65);
     ctx.font = '600 26px Arial, sans-serif';
     ctx.fillText(t.label, x + tileW / 2, tileY + 190);
   });
@@ -195,7 +199,7 @@ export async function buildScoreCard(stats = {}, opts = {}) {
   }
 
   // --- Footer ---
-  ctx.fillStyle = 'rgba(176,121,255,0.7)';
+  ctx.fillStyle = rgba.magic(0.7);
   ctx.font = '600 32px Arial, sans-serif';
   ctx.fillText('webcam workout brawler', cx, CARD_H - 70);
 

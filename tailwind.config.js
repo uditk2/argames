@@ -3,25 +3,27 @@ export default {
   content: ['./index.html', './src/**/*.{js,jsx}'],
   theme: {
     extend: {
-      // Palette pulled from design-mockup.html (night-sky / purple magic / fire-orange).
+      // Palette is externalized to CSS variables in src/index.css (the single
+      // source of truth). These reference the RGB-channel vars so Tailwind's
+      // alpha modifiers keep working (e.g. text-magic/70, border-magic/40).
       colors: {
-        magic: '#b079ff',
-        fire: '#ff7a3c',
-        'fire-bright': '#ffc25e',
-        gold: '#ffd54a',
-        shield: '#57e3ff',
-        ink: '#f3e9ff',
-        realm: '#0a0612',
-        'realm-panel': 'rgba(20,9,38,.55)',
+        magic: 'rgb(var(--magic-rgb) / <alpha-value>)',
+        fire: 'rgb(var(--fire-rgb) / <alpha-value>)',
+        'fire-bright': 'rgb(var(--fire-bright-rgb) / <alpha-value>)',
+        gold: 'rgb(var(--gold-rgb) / <alpha-value>)',
+        shield: 'rgb(var(--shield-rgb) / <alpha-value>)',
+        ink: 'rgb(var(--ink-rgb) / <alpha-value>)',
+        realm: 'rgb(var(--realm-rgb) / <alpha-value>)',
+        'realm-panel': 'var(--panel)',
       },
       fontFamily: {
         display: ['"Cinzel Decorative"', 'serif'],
         body: ['Fredoka', 'system-ui', 'sans-serif'],
       },
       boxShadow: {
-        glow: '0 0 22px rgba(176,121,255,.8)',
-        'glow-fire': '0 0 20px rgba(255,122,60,.9)',
-        'glow-shield': '0 0 24px rgba(87,227,255,.45)',
+        glow: '0 0 22px rgb(var(--magic-rgb) / .8)',
+        'glow-fire': '0 0 20px rgb(var(--fire-rgb) / .9)',
+        'glow-shield': '0 0 24px rgb(var(--shield-rgb) / .45)',
       },
     },
   },

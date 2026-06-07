@@ -12,20 +12,22 @@
 //
 // Rolling window: MediaRecorder is started with a timeslice so it emits a chunk
 // roughly every second; we keep only the most recent ~10 chunks, so at any
-// moment getLastClip() can stitch "the last 10 seconds" into one WebM Blob.
+// moment getLastClip() can stitch "the last 10 seconds" into one Blob.
 //
 // SEPARATION OF CONCERNS: this file only CAPTURES. Turning a clip into a shared
 // file is owned by the separate src/sharing/ module.
 //
-// FORMAT NOTE (honest): the clip is WebM (VP8/VP9 — broadly supported by
-// MediaRecorder on Chrome/Firefox/Edge/Android). Instagram & TikTok prefer MP4;
-// an MP4 transcode is a known follow-up (e.g. via ffmpeg.wasm or a server hop).
+// FORMAT NOTE: we record MP4 (H.264/AAC) wherever the platform can — iOS Safari
+// and modern Chrome/Android — so the clip is social-ready with no transcode.
+// WebM (VP9/VP8) is only a fallback for engines that can't record MP4 (e.g.
+// Firefox); see detectSupport() below.
 //
 // Null/again-safe: if MediaRecorder or captureStream is unsupported (e.g. older
 // Safari), we feature-detect and degrade to a no-op so the game never crashes.
 // ===========================================================================
 
 import { REPLAY } from '../config/game.config.js';
+import { rgba } from '../config/theme.js';
 
 /**
  * Detect MediaRecorder + the best available mime up front (no side effects).
@@ -164,9 +166,9 @@ export function createReplayBuffer(opts = {}) {
     if (videoEl && videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
       drawCover(ctx, videoEl, videoEl.videoWidth, videoEl.videoHeight, w, h, mirror);
     } else if (demoBg) {
-      // Demo / no-camera: a soft purple realm glow so the clip isn't empty.
+      // Demo / no-camera: a soft accent realm glow so the clip isn't empty.
       const g = ctx.createRadialGradient(w / 2, h * 1.05, h * 0.1, w / 2, h * 1.05, h * 0.9);
-      g.addColorStop(0, 'rgba(154,76,255,0.28)');
+      g.addColorStop(0, rgba.magic(0.28));
       g.addColorStop(1, 'rgba(10,5,16,0)');
       ctx.fillStyle = g;
       ctx.fillRect(0, 0, w, h);

@@ -26,6 +26,7 @@
 import { Application, Assets, Container, Sprite, Graphics, Texture, Text } from 'pixi.js';
 import { getAvatar } from '../config/avatars.js';
 import { PLAYER_RENDER_MODE } from '../config/game.config.js';
+import { COLOR } from '../config/theme.js';
 import { drainFx } from '../engine/state.js';
 import { createSfx } from './sfx.js';
 
@@ -166,7 +167,7 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
   const aura = new Sprite(tex[AURA_TEX] || Texture.WHITE);
   aura.anchor.set(0.5);
   aura.blendMode = 'add';
-  aura.tint = 0x9a4cff;       // purple magic
+  aura.tint = COLOR.magic;       // primary accent (brand)
   aura.alpha = 0;
   aura.visible = mode === 'webcam-fx';
   playerLayer.addChild(aura);
@@ -177,7 +178,7 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
     const glow = new Sprite(tex[FIST_TEX] || Texture.WHITE);
     glow.anchor.set(0.5);
     glow.blendMode = 'add';
-    glow.tint = 0xff7a3c;     // fire-orange
+    glow.tint = COLOR.fire;     // fire-orange
     const core = new Sprite(tex[FIST_CORE_TEX] || Texture.WHITE);
     core.anchor.set(0.5);
     core.blendMode = 'add';
@@ -262,10 +263,10 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
     if (mode === 'webcam-fx') {
       // Light magical vignette so the live video reads as the "demon realm"
       // without hiding the player.
-      tint.rect(0, 0, W, H).fill({ color: 0x2a103a, alpha: demo ? 0.28 : 0.16 });
+      tint.rect(0, 0, W, H).fill({ color: COLOR.realmTint, alpha: demo ? 0.28 : 0.16 });
       tint.rect(0, H * 0.72, W, H * 0.28).fill({ color: 0x3a0a1e, alpha: 0.22 });
     } else {
-      tint.rect(0, 0, W, H).fill({ color: 0x2a103a, alpha: 0.35 });
+      tint.rect(0, 0, W, H).fill({ color: COLOR.realmTint, alpha: 0.35 });
       tint.rect(0, H * 0.6, W, H * 0.4).fill({ color: 0x3a0a1e, alpha: 0.3 });
     }
 
@@ -316,7 +317,7 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
     const startA = -Math.PI / 2;
     // faint full track
     pips.arc(0, 0, r, 0, Math.PI * 2).stroke({ color: 0x000000, width: 5, alpha: 0.3 });
-    pips.arc(0, 0, r, 0, Math.PI * 2).stroke({ color: 0x57e3ff, width: 3, alpha: 0.14 });
+    pips.arc(0, 0, r, 0, Math.PI * 2).stroke({ color: COLOR.shield, width: 3, alpha: 0.14 });
     // remaining health arc (green->orange->red as it drains)
     if (frac > 0) {
       const col = frac > 0.5 ? 0x7dffa0 : frac > 0.25 ? 0xffd45e : 0xff5a4c;
@@ -366,7 +367,7 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
   function spawnPunchBurst(x, y) {
     // central flash
     spawnEnergyParticle(BURST_TEX, x, y, { tint: 0xffe7a8, scale: 0.7, max: 300, grow: 0.0026 });
-    spawnEnergyParticle(FIST_TEX, x, y, { tint: 0xff7a3c, scale: 0.9, max: 340, grow: 0.0022 });
+    spawnEnergyParticle(FIST_TEX, x, y, { tint: COLOR.fire, scale: 0.9, max: 340, grow: 0.0022 });
     // radial sparks
     for (let i = 0; i < 6; i++) {
       const a = (i / 6) * Math.PI * 2 + Math.random() * 0.5;
@@ -422,7 +423,7 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
           fontSize: big ? 30 : 20,
           fontWeight: '900',
           stroke: { color: 0x3a0a1e, width: big ? 5 : 4 },
-          dropShadow: { color: 0xff7a3c, blur: 8, distance: 0, alpha: 0.9 },
+          dropShadow: { color: COLOR.fire, blur: 8, distance: 0, alpha: 0.9 },
         },
       });
     } catch (e) {
@@ -444,7 +445,7 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
       const t = i / 6;
       const a = Math.PI + t * Math.PI; // top arc
       spawnEnergyParticle(SHIELD_FX_TEX, cx + Math.cos(a) * r, cy + Math.sin(a) * r, {
-        tint: 0x57e3ff, scale: 0.4, max: 420, grow: 0.0008, spin: 0.002,
+        tint: COLOR.shield, scale: 0.4, max: 420, grow: 0.0008, spin: 0.002,
       });
     }
   }
@@ -607,7 +608,7 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
       ward.alpha = 0.6 + 0.4 * Math.sin(now / 200);
       ward
         .arc(cx, cy, dims.W * 0.16, Math.PI, 0)
-        .stroke({ color: 0x57e3ff, width: 4, alpha: 0.9 });
+        .stroke({ color: COLOR.shield, width: 4, alpha: 0.9 });
     } else {
       ward.visible = false;
     }
@@ -682,7 +683,7 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
             const pa = px(pose[a]);
             const pb = px(pose[b]);
             skeleton.moveTo(pa.x, pa.y).lineTo(pb.x, pb.y)
-              .stroke({ color: 0xb079ff, width: 5, alpha: 0.9 });
+              .stroke({ color: COLOR.magic, width: 5, alpha: 0.9 });
           }
         }
         // glowing joints
@@ -714,7 +715,7 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
       aura.scale.set((r / (aura.texture.width || r)) * 1.4);
       aura.alpha = (state.shielding ? 0.4 : 0.26) * (0.8 + 0.2 * Math.sin(now / 400)) + (energetic ? 0.15 : 0);
       aura.rotation += 0.004;
-      aura.tint = state.shielding ? 0x57e3ff : 0x9a4cff;
+      aura.tint = state.shielding ? COLOR.shield : COLOR.magic;
     } else {
       aura.visible = false;
     }
@@ -763,8 +764,8 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
     // Gentle breathing pulse so the overlay reads as "alive" tech-magic.
     const pulse = 0.82 + 0.18 * Math.sin(now / 520);
     // Cyan-ish when shielding (matches the ward), magic-purple otherwise.
-    const lineColor = state && state.shielding ? 0x57e3ff : 0xb079ff;
-    const dotColor = 0x57e3ff;            // cyan joints to contrast the purple bones
+    const lineColor = state && state.shielding ? COLOR.shield : COLOR.magic;
+    const dotColor = COLOR.shield;            // cyan joints to contrast the purple bones
     const r = dims.H * 0.006;             // dot radius scales with canvas
 
     // Connections.

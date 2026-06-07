@@ -3,12 +3,36 @@
 @tailwind utilities;
 
 :root {
-  --magic: #b079ff;
-  --fire: #ff7a3c;
-  --fire-bright: #ffc25e;
-  --gold: #ffd54a;
-  --shield: #57e3ff;
-  --ink: #f3e9ff;
+  /* ========================================================================
+     BRAND PALETTE — SINGLE SOURCE OF TRUTH.
+     Change these and the entire game retints: Tailwind utilities, CSS, the
+     PixiJS energy FX, and the shareable score card all read from here.
+     Channels are space-separated RGB so Tailwind's alpha modifiers work
+     (e.g. text-magic/70) AND so JS (src/config/theme.js) can parse them.
+     --------------------------------------------------------------------- */
+  --magic-rgb: 255 182 39;        /* PRIMARY ACCENT — molten gold (was purple) */
+  --fire-rgb: 255 122 60;         /* fire orange */
+  --fire-bright-rgb: 255 194 94;  /* bright ember */
+  --gold-rgb: 255 213 74;         /* gold highlight */
+  --shield-rgb: 87 227 255;       /* cyan ward */
+  --ink-rgb: 250 244 233;         /* warm near-white text (matches gold) */
+  --realm-rgb: 10 6 18;           /* deep background */
+  --realm-tint-rgb: 36 22 12;     /* warm-dark vignette (was purple) */
+
+  /* Solid-color conveniences for plain CSS/SVG usage. */
+  --magic: rgb(var(--magic-rgb));
+  --fire: rgb(var(--fire-rgb));
+  --fire-bright: rgb(var(--fire-bright-rgb));
+  --gold: rgb(var(--gold-rgb));
+  --shield: rgb(var(--shield-rgb));
+  --ink: rgb(var(--ink-rgb));
+  --realm: rgb(var(--realm-rgb));
+
+  /* Brand gold lettering gradient + glassy panels. */
+  --brand-grad-1: #ffe7a8;
+  --brand-grad-2: #ff8c3c;
+  --panel: rgba(26, 18, 10, 0.55);
+  --panel-border: rgb(var(--magic-rgb) / 0.4);
 }
 
 html,
@@ -19,7 +43,7 @@ body,
 }
 
 body {
-  background: #0a0612;
+  background: var(--realm);
   color: var(--ink);
   font-family: 'Fredoka', system-ui, sans-serif;
   overflow: hidden;
@@ -32,15 +56,15 @@ body {
 
 /* Reusable glassy HUD panel (matches the mockup). */
 .panel {
-  background: rgba(20, 9, 38, 0.55);
-  border: 1px solid rgba(176, 121, 255, 0.4);
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
   border-radius: 18px;
   backdrop-filter: blur(8px);
   box-shadow: 0 6px 30px rgba(0, 0, 0, 0.45);
 }
 
 .text-glow {
-  text-shadow: 0 0 22px rgba(176, 121, 255, 0.8);
+  text-shadow: 0 0 22px rgb(var(--magic-rgb) / 0.8);
 }
 
 @keyframes spin-slow {

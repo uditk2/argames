@@ -7,7 +7,21 @@
 // ===========================================================================
 
 import React, { useEffect, useMemo, useState } from 'react';
-import { shareReplay, shareScoreCard, buildScoreCard } from '../../sharing/index.js';
+import {
+  shareReplay,
+  shareScoreCard,
+  buildScoreCard,
+  openSocialShare,
+  copyShareLink,
+} from '../../sharing/index.js';
+
+// Per-network share targets. The card image they preview is the dynamic
+// /api/og card, served via our public /s page (see src/sharing/socialShare.js).
+const NETWORKS = [
+  { key: 'x', label: 'X' },
+  { key: 'facebook', label: 'Facebook' },
+  { key: 'linkedin', label: 'LinkedIn' },
+];
 
 function fmtDur(sec) {
   const m = Math.floor(sec / 60);
@@ -106,6 +120,16 @@ export default function ResultsScreen({ results, clip, onPlayAgain }) {
     }
   }
 
+  function onSocial(network, label) {
+    const ok = openSocialShare(network, results);
+    setNote(ok ? `Opening ${label}…` : `Couldn’t open ${label}.`);
+  }
+
+  async function onCopyLink() {
+    const ok = await copyShareLink(results);
+    setNote(ok ? 'Share link copied!' : 'Couldn’t copy the link.');
+  }
+
   return (
     <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
       <img
@@ -113,10 +137,10 @@ export default function ResultsScreen({ results, clip, onPlayAgain }) {
         alt=""
         className="absolute inset-0 w-full h-full object-cover"
       />
-      <div className="absolute inset-0 bg-gradient-to-b from-[rgba(90,30,110,.5)] via-[rgba(16,8,30,.75)] to-[rgba(8,4,16,.95)]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-[rgb(var(--magic-rgb)/.28)] via-[rgba(16,10,6,.78)] to-[rgba(8,5,3,.96)]" />
 
       <div className="relative z-10 panel p-8 w-[min(94vw,560px)] max-h-[94vh] overflow-y-auto text-center">
-        <div className="font-display font-black text-2xl bg-gradient-to-b from-[#ffe7a8] to-[#ff8c3c] bg-clip-text text-transparent">
+        <div className="font-display font-black text-2xl bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">
           REALM CLEARED
         </div>
         <div className="text-[11px] tracking-[0.22em] uppercase text-magic/80 mt-1">
@@ -178,14 +202,34 @@ export default function ResultsScreen({ results, clip, onPlayAgain }) {
               disabled={!!busy}
               className="mt-2 text-[12px] px-3 py-1.5 rounded-lg font-semibold text-white bg-gradient-to-r from-fire to-magic disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 transition pointer-events-auto"
             >
-              {busy === 'card' ? 'Sharing…' : 'Share score card'}
+              {busy === 'card' ? 'Sharing…' : 'Save / share image'}
             </button>
+
+            {/* Post to a social network (previews the dynamic /api/og card). */}
+            <div className="mt-2 grid grid-cols-2 gap-1.5">
+              {NETWORKS.map((n) => (
+                <button
+                  key={n.key}
+                  onClick={() => onSocial(n.key, n.label)}
+                  className="text-[11px] px-2 py-1.5 rounded-lg font-semibold text-magic bg-realm/60 border border-magic/30 hover:bg-realm/90 hover:border-magic/60 transition pointer-events-auto"
+                >
+                  {n.label}
+                </button>
+              ))}
+              <button
+                onClick={onCopyLink}
+                className="text-[11px] px-2 py-1.5 rounded-lg font-semibold text-magic bg-realm/60 border border-magic/30 hover:bg-realm/90 hover:border-magic/60 transition pointer-events-auto"
+              >
+                Copy link
+              </button>
+            </div>
           </div>
         </div>
 
         {note && <div className="mt-3 text-[12px] text-magic/80">{note}</div>}
         <div className="mt-1 text-[10px] text-magic/40">
-          Clip is WebM. On desktop, Share saves a file; on mobile it opens the share sheet.
+          X / Facebook / LinkedIn open a share with your score card. “Save / share image” and
+          “Share clip” post the file directly (share sheet on mobile, download on desktop).
         </div>
 
         <button

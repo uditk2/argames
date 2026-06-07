@@ -7,6 +7,7 @@
 import React, { useState } from 'react';
 import { DURATION_PRESETS } from '../../config/game.config.js';
 import { AVATARS, getAvatar } from '../../config/avatars.js';
+import { BRAND } from '../../config/brand.js';
 import { trackGameStarted } from '../../analytics/ga.js';
 
 function fmt(sec) {
@@ -35,16 +36,16 @@ export default function StartScreen({ initial, onStart }) {
         className="absolute inset-0 w-full h-full object-cover"
       />
       <div className="absolute inset-0 bg-gradient-to-b from-[rgba(90,30,110,.45)] via-[rgba(16,8,30,.7)] to-[rgba(8,4,16,.92)]" />
-      <div className="absolute left-1/2 top-[58%] w-[520px] h-[520px] -ml-[260px] -mt-[260px] rounded-full border-2 border-dashed border-magic/30 animate-spin-slow shadow-[0_0_60px_rgba(176,121,255,.2)_inset]" />
+      <div className="absolute left-1/2 top-[58%] w-[520px] h-[520px] -ml-[260px] -mt-[260px] rounded-full border-2 border-dashed border-magic/30 animate-spin-slow shadow-[0_0_60px_rgb(var(--magic-rgb)/.2)_inset]" />
 
       {/* Card */}
       <div className="relative z-10 panel p-8 w-[min(92vw,460px)]">
         <div className="text-center mb-6">
-          <div className="font-display font-black text-3xl bg-gradient-to-b from-[#ffe7a8] to-[#ff8c3c] bg-clip-text text-transparent">
-            DEMON REALM
+          <div className="font-display font-black text-3xl bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">
+            {BRAND.wordmark}
           </div>
-          <div className="text-[11px] tracking-[0.24em] text-magic/80 mt-1">
-            WORKOUT ONSLAUGHT
+          <div className="text-[11px] tracking-[0.24em] text-magic/80 mt-1 uppercase">
+            {BRAND.tagline}
           </div>
         </div>
 
@@ -55,7 +56,7 @@ export default function StartScreen({ initial, onStart }) {
             <img
               src={avatar.sprites.idle}
               alt={avatar.name}
-              className="relative h-40 object-contain drop-shadow-[0_0_16px_rgba(176,121,255,.55)]"
+              className="relative h-40 object-contain drop-shadow-[0_0_16px_rgb(var(--magic-rgb)/.55)]"
             />
           </div>
           <div className="mt-2 text-sm text-ink/90">{avatar.name}</div>
