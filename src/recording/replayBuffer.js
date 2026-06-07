@@ -69,6 +69,13 @@ export function createReplayBuffer(opts = {}) {
 
   let recorder = null;
   let chunks = []; // [{ blob, t }]
+  // The VERY FIRST chunk MediaRecorder emits carries the stream initialization
+  // segment — the EBML header (WebM) or the ftyp+moov boxes (fragmented MP4).
+  // The rolling window prunes old chunks, but if we ever drop this one the
+  // concatenated clip has no header and is undecodable (Chrome throws
+  // DEMUXER_ERROR_COULD_NOT_OPEN). So we keep it forever and re-prepend it when
+  // assembling the clip.
+  let headBlob = null;
   let rafId = null;
   let offscreen = null;
   let ctx = null;
@@ -114,6 +121,7 @@ export function createReplayBuffer(opts = {}) {
 
       recorder.ondataavailable = (e) => {
         if (e.data && e.data.size) {
+          if (!headBlob) headBlob = e.data; // first chunk = header/init segment
           chunks.push({ blob: e.data, t: performance.now() });
           // Drop chunks older than the rolling window (+ one slice of slack so a
           // freshly-finalized chunk isn't pruned before it can be used).
@@ -215,6 +223,7 @@ export function createReplayBuffer(opts = {}) {
     if (rafId) cancelAnimationFrame(rafId);
     rafId = null;
     recorder = null;
+    headBlob = null;
     offscreen = null;
     ctx = null;
     videoEl = null;
@@ -231,7 +240,13 @@ export function createReplayBuffer(opts = {}) {
     const recent = chunks.filter((c) => c.t >= cutoff);
     const use = recent.length ? recent : chunks;
     const type = mime || 'video/webm';
-    const blob = new Blob(use.map((c) => c.blob), { type });
+    // Prepend the header/init segment so the muxed stream is openable even after
+    // the original first chunk was pruned out of the rolling window. Skip it if
+    // the header is already the first chunk in `use` (early game, nothing pruned).
+    const parts = [];
+    if (headBlob && (!use.length || use[0].blob !== headBlob)) parts.push(headBlob);
+    for (const c of use) parts.push(c.blob);
+    const blob = new Blob(parts, { type });
     if (!blob.size) return null;
     const url = URL.createObjectURL(blob);
     const durationSec = Math.min(windowMs, use.length * timesliceMs) / 1000;

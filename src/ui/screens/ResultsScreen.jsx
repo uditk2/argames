@@ -29,7 +29,14 @@ export default function ResultsScreen({ results, clip, onPlayAgain }) {
   const [busy, setBusy] = useState('');       // '' | 'clip' | 'card'
   const [note, setNote] = useState('');       // small status line
 
-  const hasClip = !!(clip && clip.url);
+  // Playable object URL for the clip <video>. We build it HERE from clip.blob
+  // (rather than reusing clip.url created in the replay buffer) so each mount
+  // owns its own URL. Under React StrictMode (dev) the component mounts →
+  // unmounts → mounts; a shared URL would be revoked by the first unmount's
+  // cleanup, leaving the live <video> pointing at a dead blob (MEDIA format
+  // error, dead play button). Per-mount URLs avoid that entirely.
+  const [clipUrl, setClipUrl] = useState(null);
+  const hasClip = !!clipUrl;
 
   // Build the score-card preview once on mount (feature-detects assets itself).
   useEffect(() => {
@@ -52,11 +59,17 @@ export default function ResultsScreen({ results, clip, onPlayAgain }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Revoke the clip object URL on unmount.
+  // Create a fresh playable URL from the clip blob for THIS mount, and revoke
+  // only that one on unmount. Falls back to clip.url if a blob isn't present.
   useEffect(() => {
-    return () => {
-      if (clip && clip.url) URL.revokeObjectURL(clip.url);
-    };
+    if (!clip) { setClipUrl(null); return; }
+    if (clip.blob) {
+      const url = URL.createObjectURL(clip.blob);
+      setClipUrl(url);
+      return () => URL.revokeObjectURL(url);
+    }
+    setClipUrl(clip.url || null);
+    return undefined;
   }, [clip]);
 
   const methodLabel = (m) =>
@@ -127,8 +140,9 @@ export default function ResultsScreen({ results, clip, onPlayAgain }) {
             <div className="flex-1 rounded-lg overflow-hidden bg-realm/70 aspect-[3/4] flex items-center justify-center">
               {hasClip ? (
                 <video
-                  src={clip.url}
+                  src={clipUrl}
                   controls
+                  autoPlay
                   playsInline
                   muted
                   loop
