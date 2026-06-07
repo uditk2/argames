@@ -3,26 +3,39 @@
 // ===========================================================================
 
 /**
- * Register a demon kill: bump combo (respecting the combo window), add
- * weighted score, increment slain count.
- * @returns {number} points awarded
+ * Register a single CONNECT (a fist landing on a demon). Bumps the combo
+ * chain (+1 per connect, capped, resets to 1 after a forgiving window lapses),
+ * then awards score = demon.points × current combo. This is the heart of the
+ * "every punch counts" loop — combo grows on hits, not only kills.
+ * @returns {number} points awarded for this connect
  */
-export function registerKill(state, demon, now) {
+export function registerConnect(state, demon, now) {
   const { combo: comboCfg } = state.config;
 
-  // Maintain the combo chain only if we're inside the window.
-  if (now - state.lastKillAt <= comboCfg.windowMs) {
+  // Keep the chain alive only if we're inside the forgiving window.
+  if (state.combo > 0 && now - state.lastConnectAt <= comboCfg.windowMs) {
     state.combo = Math.min(state.combo + 1, comboCfg.maxMultiplier);
   } else {
     state.combo = 1;
   }
-  state.lastKillAt = now;
+  state.lastConnectAt = now;
   state.bestCombo = Math.max(state.bestCombo, state.combo);
 
-  const points = Math.round(demon.points * state.combo);
+  // Per-connect score: a fraction of the demon's value per hit so a 7-hit
+  // brute still totals roughly its `points`, scaled by the live combo.
+  const perHit = demon.points / Math.max(1, demon.hitsToKill);
+  const points = Math.round(perHit * state.combo);
   state.score += points;
-  state.slain += 1;
   return points;
+}
+
+/**
+ * Register a demon KILL: bookkeeping only (combo/score already accrued on the
+ * killing CONNECT). Bumps slain count and stamps lastKillAt for kill-only FX.
+ */
+export function registerKill(state, demon, now) {
+  state.lastKillAt = now;
+  state.slain += 1;
 }
 
 /** Break the combo chain (currently unused; kept for future penalties). */
@@ -32,7 +45,7 @@ export function breakCombo(state) {
 
 /** Expire the combo if the window has lapsed (called each tick). */
 export function tickCombo(state, now) {
-  if (state.combo > 0 && now - state.lastKillAt > state.config.combo.windowMs) {
+  if (state.combo > 0 && now - state.lastConnectAt > state.config.combo.windowMs) {
     state.combo = 0;
   }
 }

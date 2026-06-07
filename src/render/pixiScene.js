@@ -23,10 +23,11 @@
 // with the video and the move detectors (which also run on mirrored landmarks).
 // ===========================================================================
 
-import { Application, Assets, Container, Sprite, Graphics, Texture } from 'pixi.js';
+import { Application, Assets, Container, Sprite, Graphics, Texture, Text } from 'pixi.js';
 import { getAvatar } from '../config/avatars.js';
 import { PLAYER_RENDER_MODE } from '../config/game.config.js';
 import { drainFx } from '../engine/state.js';
+import { createSfx } from './sfx.js';
 
 const BG_URL = '/assets/backgrounds/Cloudy_Sky-Night_01-1024x512.png';
 
@@ -36,6 +37,10 @@ const FX_TEXTURES = {
   kill: '/assets/effects/flame_05.png',
   shield: '/assets/effects/magic_01.png',
 };
+// Extra impact textures for the meaty connect burst.
+const IMPACT_FLASH_TEX = '/assets/effects/light_01.png';
+const IMPACT_FIRE_TEX = '/assets/effects/fire_01.png';
+const IMPACT_FLARE_TEX = '/assets/effects/flare_01.png';
 
 // Player energy FX (Kenney additive glow sprites).
 const FIST_TEX = '/assets/effects/fire_01.png';     // glowing energy fist orb
@@ -93,11 +98,21 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
   const avatar = getAvatar(avatarId);
 
   // --- Layered containers (back -> front) ---
+  // A `world` container holds everything that should shake on impact; the HUD
+  // FX (score popups) sit in `overlay` so they stay rock-steady. Screen shake
+  // is applied by offsetting `world`.
+  const world = new Container();
   const bgLayer = new Container();
   const demonLayer = new Container();
   const playerLayer = new Container();   // pose-tracked energy FX live here
   const fxLayer = new Container();
-  app.stage.addChild(bgLayer, demonLayer, playerLayer, fxLayer);
+  const overlay = new Container();        // score popups (not shaken)
+  world.addChild(bgLayer, demonLayer, playerLayer, fxLayer);
+  app.stage.addChild(world, overlay);
+
+  // Combat SFX (modular WebAudio helper). Lazy/null-safe.
+  const sfx = createSfx();
+  sfx.init();
 
   // --- Preload textures (graceful if any fail) ---
   const urls = [
@@ -106,6 +121,7 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
     avatar.sprites.punch,
     avatar.sprites.block,
     FIST_TEX, FIST_CORE_TEX, AURA_TEX, TRAIL_TEX, BURST_TEX, SHIELD_FX_TEX,
+    IMPACT_FLASH_TEX, IMPACT_FIRE_TEX, IMPACT_FLARE_TEX,
     ...Object.values(FX_TEXTURES),
   ];
   const tex = {};
@@ -193,10 +209,20 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
   ward.visible = false;
   playerLayer.addChild(ward);
 
-  // Per-demon sprite pool keyed by uid.
+  // Per-demon sprite pool keyed by uid. Each entry holds the body sprite, an
+  // HP-pip ring graphic (multi-hit damage indicator), and transient juice
+  // state (recoil stagger, death-pop animation).
   const demonSprites = new Map();
   // Active world FX particles (engine fx) + player FX particles (bursts/trails).
   const particles = [];
+  // Floating score popups (live in the steady overlay layer).
+  const popups = [];
+
+  // --- Screen shake -------------------------------------------------------
+  // `shake` is current trauma amount (0..~1); decays each frame. The world
+  // container is offset by a jittered amount proportional to trauma.
+  let shake = 0;
+  function addShake(amount) { shake = Math.min(1, shake + amount); }
 
   // --- Live pose + player-move state (set from GameScreen each frame) ------
   let pose = null;                 // mirrored landmarks (display space) | null
@@ -245,17 +271,47 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
     dims = layout();
   });
 
-  function spriteForDemon(demon) {
-    let s = demonSprites.get(demon.uid);
-    if (!s) {
-      s = new Sprite(Texture.EMPTY);
+  // Returns the per-demon render holder { box(container), s(body sprite),
+  // pips(Graphics HP ring), recoil state, death-pop state }.
+  function holderForDemon(demon) {
+    let h = demonSprites.get(demon.uid);
+    if (!h) {
+      const box = new Container();
+      const s = new Sprite(Texture.EMPTY);
       s.anchor.set(0.5);
       s.eventMode = 'static';      // allow demo-mode clicks
       s.cursor = 'pointer';
-      demonLayer.addChild(s);
-      demonSprites.set(demon.uid, s);
+      const pips = new Graphics();   // multi-hit HP ring
+      box.addChild(s, pips);
+      demonLayer.addChild(box);
+      h = {
+        box, s, pips,
+        recoilUntil: 0, recoilAng: 0,   // brief hit stagger
+        dying: false, deathT: 0,        // kill pop/fade animation
+        lastHits: demon.hitsRemaining,
+      };
+      demonSprites.set(demon.uid, h);
     }
-    return s;
+    return h;
+  }
+
+  // Draw the HP pip ring for a multi-hit demon (a thin arc that depletes as it
+  // loses HP). 1-hit imps get no ring (no clutter).
+  function drawHpRing(pips, demon, radiusPx) {
+    pips.clear();
+    if (demon.hitsToKill <= 1) return;
+    const frac = Math.max(0, demon.hitsRemaining / demon.hitsToKill);
+    const r = radiusPx * 1.02;
+    const startA = -Math.PI / 2;
+    // faint full track
+    pips.arc(0, 0, r, 0, Math.PI * 2).stroke({ color: 0x000000, width: 5, alpha: 0.3 });
+    pips.arc(0, 0, r, 0, Math.PI * 2).stroke({ color: 0x57e3ff, width: 3, alpha: 0.14 });
+    // remaining health arc (green->orange->red as it drains)
+    if (frac > 0) {
+      const col = frac > 0.5 ? 0x7dffa0 : frac > 0.25 ? 0xffd45e : 0xff5a4c;
+      pips.arc(0, 0, r, startA, startA + Math.PI * 2 * frac)
+        .stroke({ color: col, width: 4, alpha: 0.95 });
+    }
   }
 
   // Generic engine-FX particle (normalized 0..1 position).
@@ -311,6 +367,66 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
     }
   }
 
+  // IMPACT BURST at a normalized contact point (the "it connected!" pop).
+  // Scaled by demon size; bigger on a kill. Additive flash + fire + sparks.
+  function spawnImpactBurst(nx, ny, { size = 90, kill = false } = {}) {
+    const x = nx * dims.W;
+    const y = ny * dims.H;
+    const sizeK = Math.max(0.7, size / 100);   // 0.7..~2.3
+    const big = kill ? 1.7 : 1;
+
+    // hot core flash
+    spawnEnergyParticle(IMPACT_FLASH_TEX, x, y, {
+      tint: 0xffffff, scale: 0.5 * sizeK * big, alpha: 1, max: 220 * big, grow: 0.006 * big,
+    });
+    // fiery bloom
+    spawnEnergyParticle(IMPACT_FIRE_TEX, x, y, {
+      tint: kill ? 0xff5a2c : 0xff8a3c, scale: 0.7 * sizeK * big, max: 360 * big, grow: 0.004 * big,
+    });
+    // soft shock ring
+    spawnEnergyParticle(IMPACT_FLARE_TEX, x, y, {
+      tint: kill ? 0xffd45e : 0xffc46b, scale: 0.4 * sizeK * big, alpha: 0.8, max: 300 * big, grow: 0.009 * big, spin: 0.0,
+    });
+    // radial sparks (more + faster on a kill)
+    const n = kill ? 14 : 8;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 + Math.random() * 0.6;
+      const sp = (0.22 + Math.random() * 0.3) * (kill ? 1.5 : 1);
+      spawnEnergyParticle(BURST_TEX, x, y, {
+        tint: 0xffe7a8, scale: 0.3 * sizeK, max: 320, grow: 0.0008,
+        vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, spin: 0.01,
+      });
+    }
+  }
+
+  // Floating score popup that drifts up and fades (steady overlay layer).
+  function spawnScorePopup(nx, ny, text, big = false) {
+    let t;
+    try {
+      t = new Text({
+        text,
+        style: {
+          fill: big ? 0xffe07a : 0xfff2c8,
+          fontFamily: 'Arial, sans-serif',
+          fontSize: big ? 30 : 20,
+          fontWeight: '900',
+          stroke: { color: 0x3a0a1e, width: big ? 5 : 4 },
+          dropShadow: { color: 0xff7a3c, blur: 8, distance: 0, alpha: 0.9 },
+        },
+      });
+    } catch (e) {
+      return; // never let a text glyph failure break the loop
+    }
+    t.anchor.set(0.5);
+    t.x = nx * dims.W;
+    t.y = ny * dims.H - (big ? 22 : 14);
+    t._life = 0;
+    t._max = big ? 950 : 750;
+    t._vy = -0.06 - (big ? 0.02 : 0);
+    overlay.addChild(t);
+    popups.push(t);
+  }
+
   // Shield arc shimmer particles above the head.
   function spawnShieldFlourish(cx, cy, r) {
     for (let i = 0; i < 7; i++) {
@@ -355,35 +471,107 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
   function render(state, dtMs, onDemonClick) {
     const now = performance.now();
 
-    // --- Drain engine FX events into world particles ---
-    for (const fx of drainFx(state)) spawnParticle(fx.type, fx.x, fx.y);
+    // --- Drain engine FX events: JUICE on every connect (hit) and kill ---
+    for (const fx of drainFx(state)) {
+      if (fx.type === 'hit') {
+        const kill = !!fx.kill;
+        const size = fx.demonSize || 90;
+        // Impact particle burst at the contact point.
+        spawnImpactBurst(fx.x, fx.y, { size, kill });
+        // Screen shake scaled to demon size (heavier on a kill).
+        addShake((kill ? 0.5 : 0.28) * Math.max(0.6, size / 140));
+        // SFX: a softer "chip" for a non-killing brute hit, punchier otherwise.
+        const multiHitChip = !kill && (fx.hitsToKill || 1) > 2;
+        sfx.play(multiHitChip ? 'hitSoft' : 'hit', {
+          volume: kill ? 0.85 : 0.7,
+          rate: 1 + (size > 150 ? -0.15 : 0.05),
+        });
+        // Recoil stagger on the struck demon's holder.
+        const h = demonSprites.get(fx.uid);
+        if (h && !h.dying) {
+          h.recoilUntil = now + 130;
+          h.recoilAng = (Math.random() - 0.5) * 0.5;
+        }
+        // Small per-hit score popup for non-kills (kills get the bigger one).
+        if (!kill && fx.points) spawnScorePopup(fx.x, fx.y, `+${fx.points}`, false);
+      } else if (fx.type === 'kill') {
+        const size = fx.demonSize || 110;
+        // Bigger burst + meaty kill thud + extra shake.
+        spawnImpactBurst(fx.x, fx.y, { size, kill: true });
+        spawnParticle('kill', fx.x, fx.y);
+        addShake(0.6 * Math.max(0.7, size / 130));
+        sfx.play('kill', { volume: 1, rate: size > 160 ? 0.85 : 1 });
+        // Mark the holder dying so the demon pops/fades instead of vanishing.
+        const h = demonSprites.get(fx.uid);
+        if (h) { h.dying = true; h.deathT = 0; }
+        // Kill score popup uses the live combo for a satisfying number.
+        const pts = fx.points || Math.round((fx.demonPoints || 0));
+        spawnScorePopup(fx.x, fx.y - 0.02, pts ? `+${pts}` : 'SLAIN!', true);
+      } else {
+        // shield + any legacy fx
+        spawnParticle(fx.type, fx.x, fx.y);
+      }
+    }
 
     // --- Demons ---
     const seen = new Set();
     for (const demon of state.demons) {
       seen.add(demon.uid);
-      const s = spriteForDemon(demon);
-      const frameUrl = demon.frames[demon.frame];
+      const h = holderForDemon(demon);
+      const s = h.s;
+      // Show the dedicated "hit" frame briefly when flashing, else the flap frame.
+      let frameUrl = demon.frames[demon.frame];
+      if (now < demon.flashUntil && demon.hitFrame) frameUrl = demon.hitFrame;
       if (!tex[frameUrl]) {
         tex[frameUrl] = Texture.WHITE;
         Assets.load(frameUrl).then((t) => (tex[frameUrl] = t)).catch(() => {});
       }
       if (s.texture !== tex[frameUrl] && tex[frameUrl]) s.texture = tex[frameUrl];
-      s.x = demon.x * dims.W;
-      s.y = demon.y * dims.H;
+      const radiusPx = demon.size / 2;
+
+      h.box.x = demon.x * dims.W;
+      h.box.y = demon.y * dims.H;
       const sc = demon.size / (s.texture.width || demon.size);
       s.scale.set(sc);
-      s.tint = now < demon.flashUntil ? 0xffffff : 0xffd0d0;
+
+      // White flash on connect; recoil stagger (brief rotate + squash).
+      const flashing = now < demon.flashUntil;
+      s.tint = flashing ? 0xffffff : 0xffd0d0;
+      if (now < h.recoilUntil) {
+        const k = (h.recoilUntil - now) / 130;        // 1 -> 0
+        h.box.rotation = h.recoilAng * k;
+        s.scale.set(sc * (1 + 0.12 * k), sc * (1 - 0.08 * k));
+      } else {
+        h.box.rotation = 0;
+      }
       s.alpha = 1;
+
+      // Multi-hit HP pip ring.
+      drawHpRing(h.pips, demon, radiusPx);
+
       if (onDemonClick && !s._wired) {
         s._wired = true;
         s.on('pointerdown', () => onDemonClick(s._uid));
       }
       s._uid = demon.uid;
     }
-    for (const [uid, s] of demonSprites) {
-      if (!seen.has(uid)) {
-        s.destroy();
+    // Cull holders whose demon is gone — but play a death pop/fade first.
+    for (const [uid, h] of demonSprites) {
+      if (seen.has(uid)) continue;
+      if (!h._removing) {
+        h._removing = true;
+        if (!h.dying) { h.dying = true; h.deathT = 0; } // safety: cull = die
+      }
+      h.deathT += dtMs;
+      const t = Math.min(1, h.deathT / 320);
+      // pop bigger then fade + spin out
+      const pop = 1 + 0.5 * Math.sin(t * Math.PI);
+      h.box.scale.set(pop);
+      h.box.alpha = 1 - t;
+      h.box.rotation += dtMs * 0.01;
+      if (h.pips) h.pips.clear();
+      if (t >= 1) {
+        h.box.destroy({ children: true });
         demonSprites.delete(uid);
       }
     }
@@ -428,6 +616,31 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
         p.destroy();
         particles.splice(i, 1);
       }
+    }
+
+    // --- Score popups aging (steady overlay) ---
+    for (let i = popups.length - 1; i >= 0; i--) {
+      const p = popups[i];
+      p._life += dtMs;
+      const t = p._life / p._max;
+      p.y += p._vy * dims.H * (dtMs / 1000) * (1 - t * 0.4);
+      // ease out: full early then fade
+      p.alpha = t < 0.25 ? 1 : Math.max(0, 1 - (t - 0.25) / 0.75);
+      if (t >= 1) {
+        p.destroy();
+        popups.splice(i, 1);
+      }
+    }
+
+    // --- SCREEN SHAKE: jitter the world container, then decay trauma ---
+    if (shake > 0.001) {
+      const mag = shake * shake * dims.W * 0.03;   // quadratic feels punchier
+      world.x = (Math.random() * 2 - 1) * mag;
+      world.y = (Math.random() * 2 - 1) * mag;
+      shake *= Math.pow(0.86, dtMs / 16.67);
+    } else {
+      shake = 0;
+      world.x = 0; world.y = 0;
     }
   }
 
@@ -599,5 +812,9 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
     app.destroy(true, { children: true });
   }
 
-  return { app, render, layout, destroy, setPose, notifyMove, mode };
+  // Expose audio unlock so the host can resume WebAudio on a user gesture
+  // (browsers block sound until the first interaction).
+  function unlockAudio() { try { sfx.unlock(); } catch {} }
+
+  return { app, render, layout, destroy, setPose, notifyMove, unlockAudio, mode };
 }

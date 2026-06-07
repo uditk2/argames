@@ -43,19 +43,33 @@ export const CALORIES = {
   // Fraction of activeMET applied scales with normalized recent move rate.
 };
 
-// --- Spawn pacing ----------------------------------------------------------
+// --- Spawn pacing + DIFFICULTY RAMP ----------------------------------------
+// The session ramps from a slow start to a frantic finish. Both spawn RATE and
+// demon SPEED interpolate by progress = min(1, elapsed / (rampSeconds*1000)):
+//   interval = initialIntervalMs -> minIntervalMs   (faster spawns)
+//   speed    = initialSpeedScale -> maxSpeedScale   (faster demons)
 export const SPAWN = {
-  initialIntervalMs: 1600,   // gap between spawns at game start
-  minIntervalMs: 650,        // hardest pacing late game
-  rampSeconds: 120,          // time over which pacing tightens to min
-  maxConcurrentDemons: 7,    // soft cap on demons alive at once
+  initialIntervalMs: 1700,   // gap between spawns at game start (slow)
+  minIntervalMs: 520,        // hardest pacing late game (frantic)
+  rampSeconds: 110,          // time over which difficulty ramps to max
+  maxConcurrentDemons: 8,    // soft cap on demons alive at once
+  initialSpeedScale: 0.7,    // demon drift speed multiplier at start
+  maxSpeedScale: 2.1,        // demon drift speed multiplier at peak
+};
+
+// --- Collision / hit feel --------------------------------------------------
+// A CONNECT requires a *punching* fist to overlap a demon's circular hitbox.
+export const COLLISION = {
+  fistRadius: 0.05,          // normalized radius of the fist's strike zone
+  punchWindowMs: 170,        // how long a fist stays "live" after a punch fires
+  perDemonCooldownMs: 300,   // one thrust = at most one connect per demon
 };
 
 // --- Combo rules -----------------------------------------------------------
 export const COMBO = {
-  windowMs: 2500,            // time after a kill to keep the chain alive
+  windowMs: 2500,            // forgiving time after a CONNECT to keep the chain
   maxMultiplier: 12,         // matches the mockup "×8..×12" feel
-  // score per kill = demon.points * min(currentCombo, maxMultiplier)
+  // score per connect = (demon.points / demon.hitsToKill) * min(combo, max)
 };
 
 // --- Instant-replay capture ------------------------------------------------
@@ -76,6 +90,7 @@ export function makeRunConfig({ durationSec = DEFAULT_DURATION, bodyweightKg = D
     bodyweightKg,
     calories: CALORIES,
     spawn: SPAWN,
+    collision: COLLISION,
     combo: COMBO,
     playerRenderMode: PLAYER_RENDER_MODE,
   };

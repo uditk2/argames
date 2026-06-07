@@ -72,6 +72,15 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
       }
       sceneRef.current = scene;
 
+      // Unlock WebAudio on the first user gesture (browsers gate sound).
+      const unlock = () => { try { scene.unlockAudio && scene.unlockAudio(); } catch {} };
+      window.addEventListener('pointerdown', unlock, { once: true });
+      window.addEventListener('keydown', unlock, { once: true });
+      cleanups.push(() => {
+        window.removeEventListener('pointerdown', unlock);
+        window.removeEventListener('keydown', unlock);
+      });
+
       // Route every detected move into the scene so it can spawn the matching
       // pose-tracked energy FX (punch bursts, shield arc).
       cleanups.push(bus.subscribe((move) => scene.notifyMove(move)));
@@ -107,9 +116,14 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
         const dt = Math.min(50, now - last); // clamp big gaps (tab switch)
         last = now;
 
-        // Demo mode has no camera: synthesize a gently-moving "pose" so the
-        // glowing energy fists visibly track simulated wrists.
-        if (demo) scene.setPose(makeDemoPose(now));
+        // Demo mode has no camera: synthesize a moving "pose" whose wrists
+        // actively chase incoming demons so the fists really OVERLAP them and
+        // trigger genuine collision connects (bursts, shake, pips, combo).
+        if (demo) {
+          const dp = makeDemoPose(now, game.state);
+          scene.setPose(dp);
+          feedFists(game, dp);
+        }
 
         const finished = game.step(dt);
         scene.render(game.state, dt, (uid) => {
@@ -175,6 +189,9 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
             ? landmarks.map((p) => ({ ...p, x: 1 - p.x }))
             : null;
           if (sceneRef.current) sceneRef.current.setPose(mirrored);
+          // Feed the live fist (wrist) positions into the engine so collision
+          // can test them against demons. Detectors still gate "is this a punch".
+          feedFists(game, mirrored);
           for (const m of punch.detect(mirrored, dt, now)) bus.emit(m);
           for (const m of shield.detect(mirrored, dt, now)) bus.emit(m);
         });
@@ -186,29 +203,70 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
       }
     }
 
+    // Pull the two wrist (15/16) positions from landmarks and push them into
+    // the engine as normalized fist positions for collision. Null-safe.
+    function feedFists(game, landmarks) {
+      if (!game || !game.setFists) return;
+      const w = (i) => {
+        const p = landmarks && landmarks[i];
+        if (!p || (p.visibility != null && p.visibility < 0.4)) return null;
+        return { x: p.x, y: p.y };
+      };
+      game.setFists(w(15), w(16));
+    }
+
+    // Demo fist simulation state: each fist eases toward a chosen demon target,
+    // then we fire a side-punch when it's overlapping so the ENGINE COLLISION
+    // path produces a real connect (same code path the camera uses).
+    const demoFist = {
+      left: { x: 0.34, y: 0.52, uid: null },
+      right: { x: 0.66, y: 0.52, uid: null },
+    };
+
+    // Pick the nearest live demon on the given half of the screen for a fist.
+    function pickDemoTarget(state, side) {
+      let best = null, bestD = Infinity;
+      for (const d of state.demons) {
+        if (d.dead) continue;
+        const onSide = side === 'left' ? d.x <= 0.55 : d.x >= 0.45;
+        if (!onSide) continue;
+        const dx = d.x - (side === 'left' ? 0.4 : 0.6);
+        const dist = dx * dx + (d.y - 0.4) * (d.y - 0.4);
+        if (dist < bestD) { bestD = dist; best = d; }
+      }
+      return best;
+    }
+
     // --- Demo: synthetic move emitter (no camera) ---
+    // Periodically fires side-punches (arming a fist) + occasional shields.
+    // The fist positions themselves are driven in makeDemoPose() toward demons,
+    // so the punch lands via real overlap collision (not a direct uid hit).
     function startDemoInput(bus, game) {
       demoInterval = setInterval(() => {
         const s = game.state;
         if (s.phase !== 'running') return;
         const r = Math.random();
-        if (r < 0.72 && s.demons.length) {
-          // punch a random live demon; tag a side so the burst lands at a fist
-          const target = s.demons[Math.floor(Math.random() * s.demons.length)];
+        if (r < 0.82 && s.demons.length) {
+          // Arm whichever fist is currently nearest a demon so it connects.
           const side = Math.random() < 0.5 ? 'left' : 'right';
-          bus.emit({ type: 'punch', payload: { uid: target.uid, x: target.x, y: target.y, side } });
-        } else if (r < 0.9) {
+          bus.emit({ type: 'punch', payload: { side } });
+          // also jab with the other fist sometimes for combo build-up
+          if (Math.random() < 0.5) {
+            const other = side === 'left' ? 'right' : 'left';
+            bus.emit({ type: 'punch', payload: { side: other } });
+          }
+        } else if (r < 0.95) {
           bus.emit({ type: 'shield' });
           setTimeout(() => bus.emit({ type: 'shield-end' }), 500);
         }
-      }, 320);
+      }, 260);
       cleanups.push(() => clearInterval(demoInterval));
     }
 
-    // Simulated pose for demo mode: a stable torso with both wrists drifting in
-    // small loops so the energy fists feel alive. Already in mirrored/display
-    // space (same convention the real pose feed uses). Indices match MediaPipe.
-    function makeDemoPose(t) {
+    // Simulated pose for demo mode. Stable torso; each WRIST eases toward the
+    // nearest demon on its half so the glowing fists really overlap incoming
+    // demons (driving genuine collision connects). Mirrored/display space.
+    function makeDemoPose(t, state) {
       const lm = new Array(33).fill(null).map(() => ({ x: 0.5, y: 0.5, visibility: 0 }));
       const set = (i, x, y) => { lm[i] = { x, y, z: 0, visibility: 1 }; };
       const phase = t / 1000;
@@ -217,11 +275,24 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
       set(23, 0.43, 0.66); set(24, 0.57, 0.66);            // hips
       set(25, 0.43, 0.82); set(26, 0.57, 0.82);            // knees
       set(27, 0.43, 0.96); set(28, 0.57, 0.96);            // ankles
-      // wrists loop around chest height
-      set(15, 0.34 + 0.06 * Math.cos(phase * 1.7), 0.52 + 0.07 * Math.sin(phase * 2.1));  // left
-      set(16, 0.66 + 0.06 * Math.cos(phase * 1.9 + 1), 0.52 + 0.07 * Math.sin(phase * 2.3 + 2)); // right
-      // elbows (rough midpoints, for skeleton mode)
-      set(13, 0.37, 0.47); set(14, 0.63, 0.47);
+
+      for (const side of ['left', 'right']) {
+        const f = demoFist[side];
+        const target = state ? pickDemoTarget(state, side) : null;
+        // home position (idle bob) when no target on this side
+        const homeX = side === 'left' ? 0.34 : 0.66;
+        const homeY = 0.52 + 0.05 * Math.sin(phase * (side === 'left' ? 2.1 : 2.3));
+        const tx = target ? target.x : homeX;
+        const ty = target ? target.y : homeY;
+        // ease toward the target (snappy enough to actually reach it)
+        f.x += (tx - f.x) * 0.18;
+        f.y += (ty - f.y) * 0.18;
+      }
+      set(15, demoFist.left.x, demoFist.left.y);            // left wrist
+      set(16, demoFist.right.x, demoFist.right.y);          // right wrist
+      // elbows (rough midpoints toward each wrist, for skeleton mode)
+      set(13, (0.40 + demoFist.left.x) / 2, (0.40 + demoFist.left.y) / 2);
+      set(14, (0.60 + demoFist.right.x) / 2, (0.40 + demoFist.right.y) / 2);
       return lm;
     }
 

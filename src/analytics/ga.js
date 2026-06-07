@@ -4,7 +4,7 @@
 // No-ops cleanly if the ID is still the placeholder or gtag fails to load.
 // ===========================================================================
 
-const MEASUREMENT_ID = 'G-XXXXXXXXXX'; // <-- replace with your GA4 Measurement ID
+const MEASUREMENT_ID = 'G-B8H0EYCQ6Y'; // GA4 Measurement ID
 
 let initialized = false;
 
