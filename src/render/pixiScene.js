@@ -244,8 +244,13 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
   }
 
   function layout() {
-    const W = app.renderer.width / app.renderer.resolution;
-    const H = app.renderer.height / app.renderer.resolution;
+    // Use Pixi's LOGICAL screen rectangle (CSS pixels), not renderer.width/height
+    // ÷ resolution. On high-DPR phones (devicePixelRatio 2–3) that division
+    // collapses the coordinate space to the top ~1/dpr of the canvas, so the
+    // vignette + play area only covered the upper part of the screen and a hard
+    // dark band appeared mid-screen. app.screen is resolution-independent.
+    const W = app.screen.width;
+    const H = app.screen.height;
 
     // cover-fit background
     const scale = Math.max(W / bg.texture.width, H / bg.texture.height);
