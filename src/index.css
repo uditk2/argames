@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --magic: #b079ff;
+  --fire: #ff7a3c;
+  --fire-bright: #ffc25e;
+  --gold: #ffd54a;
+  --shield: #57e3ff;
+  --ink: #f3e9ff;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: #0a0612;
+  color: var(--ink);
+  font-family: 'Fredoka', system-ui, sans-serif;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+.font-display {
+  font-family: 'Cinzel Decorative', serif;
+}
+
+/* Reusable glassy HUD panel (matches the mockup). */
+.panel {
+  background: rgba(20, 9, 38, 0.55);
+  border: 1px solid rgba(176, 121, 255, 0.4);
+  border-radius: 18px;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 6px 30px rgba(0, 0, 0, 0.45);
+}
+
+.text-glow {
+  text-shadow: 0 0 22px rgba(176, 121, 255, 0.8);
+}
+
+@keyframes spin-slow {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.animate-spin-slow {
+  animation: spin-slow 40s linear infinite;
+}
+
+@keyframes pulse-soft {
+  0%, 100% { transform: scale(0.95); opacity: 0.75; }
+  50% { transform: scale(1.06); opacity: 1; }
+}
+.animate-pulse-soft {
+  animation: pulse-soft 1.6s ease-in-out infinite;
+}
+
+@keyframes blink {
+  50% { opacity: 0.25; }
+}
+.animate-blink {
+  animation: blink 1.1s steps(1) infinite;
+}

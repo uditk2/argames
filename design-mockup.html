@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<!--
+  DESIGN MOCKUP v3 — "Demon Realm" 3-minute workout brawler (in-game screen)
+  Real CC0 assets: night sky + demon sprites + boxer player character.
+  Changes: no Newtons, no health bar, 3-min workout timer is the goal,
+  demons keep streaming in. Throwaway visual reference only.
+-->
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Demon Realm — design mockup v3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cinzel+Decorative:wght@700;900&family=Fredoka:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root { --magic:#b079ff; --fire:#ff7a3c; --fire-bright:#ffc25e; --gold:#ffd54a; --shield:#57e3ff; --ink:#f3e9ff; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  html,body { height:100%; }
+  body { font-family:'Fredoka',system-ui,sans-serif; color:var(--ink); background:#0a0612; overflow:hidden; -webkit-font-smoothing:antialiased; }
+
+  .stage { position:relative; width:100vw; height:100vh; overflow:hidden; }
+  .bg-img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; z-index:0; }
+  .bg-tint { position:absolute; inset:0; z-index:1;
+    background:
+      radial-gradient(120% 80% at 50% 6%, rgba(90,30,110,.45) 0%, rgba(16,8,30,.65) 50%, rgba(8,4,16,.9) 100%),
+      radial-gradient(60% 50% at 80% 100%, rgba(120,20,60,.35), transparent 60%); }
+  .runes { position:absolute; left:50%; top:64%; width:520px; height:520px; margin:-260px 0 0 -260px;
+    border-radius:50%; border:2px dashed rgba(176,121,255,.28); z-index:2;
+    box-shadow:0 0 60px rgba(176,121,255,.2) inset; animation:spin 40s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg);} }
+  #embers { position:absolute; inset:0; z-index:3; pointer-events:none; }
+
+  /* shield ward */
+  .ward { position:absolute; left:50%; top:12%; width:300px; height:150px; margin-left:-150px; z-index:5;
+    border-radius:150px 150px 0 0; border:3px solid rgba(87,227,255,.85);
+    box-shadow:0 0 30px rgba(87,227,255,.6), 0 0 60px rgba(87,227,255,.3) inset;
+    background:linear-gradient(180deg, rgba(87,227,255,.16), transparent); animation:shimmer 1.6s ease-in-out infinite; }
+  @keyframes shimmer { 0%,100%{opacity:.6} 50%{opacity:1} }
+
+  /* demons — toughness implied by size, no numbers */
+  .demon { position:absolute; z-index:5; }
+  .demon img { display:block; filter:drop-shadow(0 6px 14px rgba(255,60,60,.45)); }
+  .demon.big   { left:47%; top:13%; }              .demon.big img   { width:140px; }
+  .demon.mid   { left:11%; top:30%; animation:floatL 3.4s ease-in-out infinite; } .demon.mid img { width:92px; }
+  .demon.small { right:12%; top:36%; animation:floatR 3s ease-in-out infinite; }  .demon.small img { width:60px; }
+  .demon.incoming { right:-4%; top:20%; animation:floatR 2.4s ease-in-out infinite; opacity:.85; } .demon.incoming img { width:54px; }
+  @keyframes floatL { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-16px)} }
+  @keyframes floatR { 0%,100%{transform:translateY(-10px)} 50%{transform:translateY(10px)} }
+
+  /* player — real boxer sprite */
+  .player-wrap { position:absolute; left:50%; bottom:4%; transform:translateX(-50%); z-index:6; text-align:center; }
+  .player-aura { position:absolute; left:50%; top:46%; width:300px; height:300px; margin:-150px 0 0 -150px; border-radius:50%;
+    background:radial-gradient(circle, rgba(176,121,255,.4) 0%, rgba(176,121,255,0) 62%); animation:pulse 2.4s ease-in-out infinite; z-index:-1; }
+  @keyframes pulse { 0%,100%{transform:scale(.92);opacity:.7} 50%{transform:scale(1.06);opacity:1} }
+  .player-wrap img { width:230px; filter:drop-shadow(0 0 16px rgba(176,121,255,.55)) drop-shadow(0 8px 16px rgba(0,0,0,.5)); }
+
+  /* HUD */
+  .hud { position:absolute; inset:0; z-index:10; pointer-events:none; }
+  .panel { background:rgba(20,9,38,.55); border:1px solid rgba(176,121,255,.4); border-radius:18px; backdrop-filter:blur(8px); box-shadow:0 6px 30px rgba(0,0,0,.45); padding:12px 16px; }
+  .label { font-size:11px; letter-spacing:.14em; text-transform:uppercase; color:#b79bd8; font-weight:600; }
+
+  /* top-center: the 3-minute workout timer = the goal */
+  .timer { position:absolute; top:16px; left:50%; transform:translateX(-50%); text-align:center; }
+  .timer .num { font-family:'Cinzel Decorative',serif; font-weight:900; font-size:46px; line-height:1; color:#fff; text-shadow:0 0 22px rgba(176,121,255,.8); }
+  .timer .lbl { font-size:11px; letter-spacing:.22em; text-transform:uppercase; color:#c5a9ee; margin-top:2px; }
+  .timer .bar { width:220px; height:6px; margin:8px auto 0; border-radius:6px; background:rgba(255,255,255,.14); overflow:hidden; }
+  .timer .bar i { display:block; height:100%; width:26%; border-radius:6px; background:linear-gradient(90deg,var(--magic),var(--shield)); box-shadow:0 0 12px rgba(176,121,255,.7); }
+
+  .brand { position:absolute; top:16px; left:18px; }
+  .brand .t { font-family:'Cinzel Decorative',serif; font-weight:900; font-size:18px;
+    background:linear-gradient(180deg,#ffe7a8,#ff8c3c); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .brand .s { font-size:10px; letter-spacing:.24em; color:#b79bd8; }
+
+  .top-right { position:absolute; top:16px; right:18px; text-align:right; }
+  .score-num { font-family:'Cinzel Decorative',serif; font-weight:900; font-size:34px; line-height:1; color:#fff; text-shadow:0 0 16px rgba(176,121,255,.8); }
+  .stat-row { display:flex; gap:18px; justify-content:flex-end; margin-top:8px; }
+  .stat .v { font-size:19px; font-weight:700; }
+  .v.gold { color:var(--gold); } .v.fire { color:var(--fire-bright); }
+
+  .combo { position:absolute; top:50%; left:20px; transform:translateY(-50%); text-align:center; }
+  .combo .x { font-family:'Cinzel Decorative',serif; font-weight:900; font-size:44px; color:var(--fire-bright); text-shadow:0 0 20px rgba(255,122,60,.9); animation:pulse 1s ease-in-out infinite; }
+  .combo .lbl { font-size:11px; letter-spacing:.2em; color:#ffba8a; text-transform:uppercase; }
+
+  /* self-view */
+  .selfview { position:absolute; bottom:18px; left:18px; width:160px; z-index:11; }
+  .selfview .frame { position:relative; height:120px; border-radius:16px; overflow:hidden; background:#10202c;
+    border:2px solid rgba(87,227,255,.55); box-shadow:0 0 24px rgba(87,227,255,.3), 0 8px 24px rgba(0,0,0,.5); }
+  .selfview .you { position:absolute; inset:0; display:flex; align-items:flex-end; justify-content:center;
+    background:radial-gradient(80% 90% at 50% 120%, rgba(87,227,255,.25), transparent 70%); }
+  .selfview .tag { position:absolute; top:8px; left:8px; display:flex; align-items:center; gap:6px; font-size:11px; font-weight:600; background:rgba(0,0,0,.5); padding:3px 8px; border-radius:20px; }
+  .selfview .tag .dot { width:8px; height:8px; border-radius:50%; background:#ff3b5c; box-shadow:0 0 8px #ff3b5c; animation:blink 1.1s steps(1) infinite; }
+  .selfview .cap { margin-top:6px; font-size:11px; color:#a98fce; text-align:center; }
+  @keyframes blink { 50%{opacity:.25} }
+
+  /* side-by-side replay */
+  .replay { position:absolute; bottom:18px; right:18px; width:268px; z-index:11; border-radius:18px; overflow:hidden;
+    border:1px solid rgba(176,121,255,.4); background:rgba(20,9,38,.62); backdrop-filter:blur(8px); box-shadow:0 8px 30px rgba(0,0,0,.5); }
+  .replay .head { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; }
+  .replay .head .t { font-size:13px; font-weight:600; }
+  .replay .head .s { font-size:11px; color:#a98fce; }
+  .replay .panes { display:flex; gap:4px; padding:0 8px 8px; position:relative; }
+  .replay .pane { flex:1; height:84px; border-radius:10px; position:relative; overflow:hidden; }
+  .replay .pane .lbl { position:absolute; bottom:4px; left:6px; font-size:10px; letter-spacing:.12em; text-transform:uppercase; color:#fff; opacity:.85; }
+  .replay .pane.realm { background:radial-gradient(60% 70% at 50% 40%, rgba(176,121,255,.55), #1a0c30 75%); }
+  .replay .pane.self { background:radial-gradient(70% 80% at 50% 120%, rgba(87,227,255,.3), #10202c 70%); }
+  .replay .play { position:absolute; left:50%; top:34px; transform:translateX(-50%); width:34px; height:34px; }
+
+  .footer-hint { position:absolute; bottom:6px; left:50%; transform:translateX(-50%); z-index:11; font-size:11px; color:#8f78b8; }
+
+  /* ground trap (jump / dodge) */
+  .trap { position:absolute; left:38%; bottom:7%; z-index:5; text-align:center; animation:shimmer 1s ease-in-out infinite; }
+  .trap .jumpcue { font-family:'Cinzel Decorative',serif; font-weight:900; font-size:16px; color:var(--magic); text-shadow:0 0 14px rgba(176,121,255,.9); margin-bottom:2px; }
+</style>
+</head>
+<body>
+<div class="stage">
+  <img class="bg-img" src="assets/backgrounds/Cloudy_Sky-Night_01-1024x512.png" alt="" />
+  <div class="bg-tint"></div>
+  <div class="runes"></div>
+  <canvas id="embers"></canvas>
+
+  <div class="ward"></div>
+
+  <!-- demon stream (no numbers; size = toughness) -->
+  <div class="demon big"><img src="assets/sprites/demon_fly_1.png" alt="demon" /></div>
+  <div class="demon mid"><img src="assets/sprites/demon_fly_2.png" alt="demon" /></div>
+  <div class="demon small"><img src="assets/sprites/demon_fly_3.png" alt="demon" /></div>
+  <div class="demon incoming"><img src="assets/sprites/demon_fly_4.png" alt="demon" /></div>
+
+  <!-- ground trap to jump / dodge -->
+  <div class="trap">
+    <div class="jumpcue">JUMP ⤒</div>
+    <svg width="150" height="40" viewBox="0 0 150 40">
+      <g fill="none" stroke="#b079ff" stroke-width="3" stroke-linejoin="round">
+        <path d="M8 36 L24 10 L40 36 M52 36 L68 10 L84 36 M96 36 L112 10 L128 36"/>
+      </g>
+      <g fill="rgba(176,121,255,.25)"><path d="M8 36 L24 12 L40 36 Z M52 36 L68 12 L84 36 Z M96 36 L112 12 L128 36 Z"/></g>
+    </svg>
+  </div>
+
+  <!-- player: real boxer sprite -->
+  <div class="player-wrap">
+    <div class="player-aura"></div>
+    <img src="assets/sprites/player_punch.png" alt="boxer" />
+  </div>
+
+  <!-- HUD -->
+  <div class="hud">
+    <div class="brand"><div class="t">DEMON REALM</div><div class="s">3-MINUTE ONSLAUGHT</div></div>
+
+    <!-- the goal: 3-minute workout timer -->
+    <div class="timer">
+      <div class="num">2:13</div>
+      <div class="lbl">time left</div>
+      <div class="bar"><i></i></div>
+    </div>
+
+    <div class="top-right">
+      <div class="label">Score</div>
+      <div class="score-num">12,480</div>
+      <div class="stat-row">
+        <div class="stat"><div class="label">Slain</div><div class="v gold">37</div></div>
+        <div class="stat"><div class="label">Kcal</div><div class="v fire">94</div></div>
+      </div>
+    </div>
+
+    <div class="combo"><div class="lbl">Combo</div><div class="x">×8</div></div>
+
+    <div class="selfview">
+      <div class="frame">
+        <div class="you">
+          <svg width="70" height="92" viewBox="0 0 70 92"><g fill="rgba(180,230,255,.85)"><circle cx="35" cy="22" r="15"/><path d="M12 92 q0 -40 23 -40 q23 0 23 40 z"/></g></svg>
+        </div>
+        <div class="tag"><span class="dot"></span> LIVE</div>
+      </div>
+      <div class="cap">your camera</div>
+    </div>
+
+    <div class="replay">
+      <div class="head"><span class="t">Instant replay</span><span class="s">last 10s · tap to share</span></div>
+      <div class="panes">
+        <div class="pane realm"><span class="lbl">Realm</span></div>
+        <div class="pane self">
+          <svg style="position:absolute;left:50%;bottom:0;transform:translateX(-50%)" width="46" height="60" viewBox="0 0 70 92"><g fill="rgba(180,230,255,.8)"><circle cx="35" cy="22" r="15"/><path d="M12 92 q0 -40 23 -40 q23 0 23 40 z"/></g></svg>
+          <span class="lbl">You</span>
+        </div>
+        <svg class="play" viewBox="0 0 24 24"><circle cx="12" cy="12" r="11" fill="rgba(0,0,0,.45)"/><path d="M9 7 L17 12 L9 17 Z" fill="#fff"/></svg>
+      </div>
+    </div>
+
+    <div class="footer-hint">punch what flies in · arms up to block · jump to dodge</div>
+  </div>
+</div>
+
+<script>
+  const c=document.getElementById('embers'),x=c.getContext('2d');let W,H,P;
+  function rs(){W=c.width=innerWidth;H=c.height=innerHeight;P=Array.from({length:64},sp);}
+  function sp(){return{x:Math.random()*innerWidth,y:innerHeight+Math.random()*innerHeight,r:Math.random()*2.4+.6,s:Math.random()*.6+.2,h:Math.random()<.5?'176,121,255':'255,150,80',a:Math.random()*.5+.2,d:(Math.random()-.5)*.4};}
+  function t(){x.clearRect(0,0,W,H);for(const p of P){p.y-=p.s;p.x+=p.d;if(p.y<-10)Object.assign(p,sp(),{y:H+10});x.beginPath();x.arc(p.x,p.y,p.r,0,7);x.fillStyle=`rgba(${p.h},${p.a})`;x.shadowBlur=8;x.shadowColor=`rgba(${p.h},${p.a})`;x.fill();}requestAnimationFrame(t);}
+  addEventListener('resize',rs);rs();t();
+</script>
+</body>
+</html>

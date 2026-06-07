@@ -1,0 +1,32 @@
+{
+  "note": "Logical asset map for the modular loader. All CC0. Paths are relative to /assets.",
+  "backgrounds": {
+    "nightSkies": "backgrounds/*Night*-1024x512.png",
+    "default": "backgrounds/Fuzzy_Sky-Night_02-1024x512.png"
+  },
+  "demons": {
+    "fly": [
+      "sprites/Transparent PNG/flying/frame-1.png",
+      "sprites/Transparent PNG/flying/frame-2.png",
+      "sprites/Transparent PNG/flying/frame-3.png",
+      "sprites/Transparent PNG/flying/frame-4.png"
+    ],
+    "hit": [
+      "sprites/Transparent PNG/got hit/frame-1.png",
+      "sprites/Transparent PNG/got hit/frame-2.png"
+    ]
+  },
+  "fx": {
+    "dir": "effects/_keep",
+    "punchImpact": ["effects/_keep/fire_01.png", "effects/_keep/flame_05.png"],
+    "shield": ["effects/_keep/light_01.png", "effects/_keep/circle_05.png"],
+    "magicBurst": ["effects/_keep/flare_01.png", "effects/_keep/light_02.png"],
+    "sparkle": "effects/_keep/star_*.png"
+  },
+  "audio": {
+    "dir": "audio/Audio",
+    "punch": "audio/Audio/impactPunch_*.ogg",
+    "hurt": "audio/Audio/impactSoft_*.ogg",
+    "dodgeStep": "audio/Audio/footstep_concrete_*.ogg"
+  }
+}
