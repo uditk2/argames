@@ -65,10 +65,12 @@ export const SPAWN = {
 // thin margin so demons never clip fully off-screen. The bottom-right replay
 // card is HUD (drawn on top), so demons there are fine.
 export const PLAY_AREA = {
-  xMin: 0.04, xMax: 0.96,      // full width (minus a thin margin)
-  yMin: 0.06, yMax: 0.92,      // top of head down to ~knees once stepped back
-  spawnYMin: 0.10,             // demons appear from near the top...
-  spawnYMax: 0.80,             // ...down through the torso so the lower frame is used
+  // Use the ENTIRE screen edge-to-edge. The small inset (~0.05) is just so a
+  // demon's body doesn't clip half off; centers still reach every edge/corner.
+  xMin: 0.05, xMax: 0.95,
+  yMin: 0.05, yMax: 0.95,
+  spawnYMin: 0.07,             // demons appear from the very top...
+  spawnYMax: 0.93,             // ...all the way down to the bottom of the screen
 };
 
 // --- Collision / hit feel --------------------------------------------------

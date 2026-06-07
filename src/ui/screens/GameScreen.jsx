@@ -22,7 +22,6 @@ import { timerProgress } from '../../engine/timer.js';
 import Timer from '../hud/Timer.jsx';
 import ScorePanel from '../hud/ScorePanel.jsx';
 import ComboMeter from '../hud/ComboMeter.jsx';
-import ReplayCard from '../hud/ReplayCard.jsx';
 
 // Landmarks that must all be in-frame for the player to count as "fully visible
 // to the knees": nose, both shoulders, both hips, both knees. (MediaPipe Pose.)
@@ -401,11 +400,11 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
       {/* HUD overlay */}
       <div className="absolute inset-0 z-10">
         {/* Brand */}
-        <div className="absolute top-4 left-5">
-          <div className="font-display font-black text-lg bg-gradient-to-b from-[#ffe7a8] to-[#ff8c3c] bg-clip-text text-transparent">
+        <div className="absolute top-2 left-3 sm:top-4 sm:left-5">
+          <div className="font-display font-black text-sm sm:text-lg bg-gradient-to-b from-[#ffe7a8] to-[#ff8c3c] bg-clip-text text-transparent">
             DEMON REALM
           </div>
-          <div className="text-[10px] tracking-[0.24em] text-magic/70">
+          <div className="hidden sm:block text-[10px] tracking-[0.24em] text-magic/70">
             {Math.round(settings.durationSec / 60)}-MINUTE ONSLAUGHT
           </div>
         </div>
@@ -418,7 +417,6 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
             <ComboMeter combo={hud.combo} />
           </>
         )}
-        <ReplayCard supported={replaySupported} />
 
         {/* Pre-game framing gate: guide outline + "step back" prompt + 3-2-1. */}
         {calib && status === 'ready' && (
