@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 220" width="200" height="220">
+  <defs>
+    <linearGradient id="tBody" x1="0" y1="0" x2="1" y2="0.15">
+      <stop offset="0" stop-color="#161a2e"/>
+      <stop offset="0.5" stop-color="#2c3358"/>
+      <stop offset="1" stop-color="#12162a"/>
+    </linearGradient>
+    <linearGradient id="tPlate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3a4274"/>
+      <stop offset="1" stop-color="#202745"/>
+    </linearGradient>
+    <radialGradient id="tCore" cx="0.5" cy="0.42" r="0.5">
+      <stop offset="0" stop-color="#bff4ff"/>
+      <stop offset="0.5" stop-color="#57e3ff"/>
+      <stop offset="1" stop-color="#1d6f8c" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- neck stub -->
+  <rect x="84" y="2" width="32" height="34" rx="12" fill="url(#tBody)" stroke="#5b6bb0" stroke-width="2"/>
+
+  <!-- shoulder yoke / pauldron span -->
+  <path d="M14,52 Q100,8 186,52 Q190,70 178,82 Q100,46 22,82 Q10,70 14,52 Z"
+        fill="url(#tPlate)" stroke="#5b6bb0" stroke-width="2.5"/>
+
+  <!-- main trunk: shoulders (wide) tapering to the waist then hips -->
+  <path d="M30,60 Q100,40 170,60 L156,150 Q150,176 168,202 L120,210 Q100,204 80,210 L32,202 Q50,176 44,150 Z"
+        fill="url(#tBody)" stroke="#5b6bb0" stroke-width="2.5"/>
+
+  <!-- chest plate -->
+  <path d="M62,74 Q100,60 138,74 L130,128 Q100,142 70,128 Z"
+        fill="url(#tPlate)" stroke="#6b78c0" stroke-width="1.5" opacity="0.95"/>
+
+  <!-- glowing energy core -->
+  <ellipse cx="100" cy="104" rx="30" ry="34" fill="url(#tCore)"/>
+  <circle cx="100" cy="100" r="11" fill="#eaffff"/>
+  <circle cx="100" cy="100" r="11" fill="#57e3ff" opacity="0.45"/>
+
+  <!-- abdominal seams -->
+  <path d="M100,140 L100,196" stroke="#57e3ff" stroke-width="2.5" opacity="0.5" stroke-linecap="round"/>
+  <path d="M72,156 q28,12 56,0" stroke="#5b6bb0" stroke-width="2" fill="none" opacity="0.6"/>
+  <path d="M76,176 q24,10 48,0" stroke="#5b6bb0" stroke-width="2" fill="none" opacity="0.6"/>
+
+  <!-- left edge highlight -->
+  <path d="M40,64 Q44,120 52,150" stroke="#7a87c8" stroke-width="3" fill="none" opacity="0.45" stroke-linecap="round"/>
+</svg>

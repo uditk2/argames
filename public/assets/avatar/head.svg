@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 170 190" width="170" height="190">
+  <defs>
+    <linearGradient id="hHelm" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#39416f"/>
+      <stop offset="0.55" stop-color="#222a4c"/>
+      <stop offset="1" stop-color="#141831"/>
+    </linearGradient>
+    <linearGradient id="hVisor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#103043"/>
+      <stop offset="0.5" stop-color="#0a1a2a"/>
+      <stop offset="1" stop-color="#06101c"/>
+    </linearGradient>
+    <linearGradient id="hEye" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#bff4ff"/>
+      <stop offset="1" stop-color="#57e3ff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- neck stub (connects down to torso) -->
+  <rect x="68" y="138" width="34" height="44" rx="13" fill="url(#hHelm)" stroke="#5b6bb0" stroke-width="2"/>
+
+  <!-- helmet dome -->
+  <path d="M85,8 C128,8 150,40 150,82 C150,120 126,150 85,150 C44,150 20,120 20,82 C20,40 42,8 85,8 Z"
+        fill="url(#hHelm)" stroke="#5b6bb0" stroke-width="3"/>
+
+  <!-- crest fin -->
+  <path d="M85,4 C92,18 92,34 85,46 C78,34 78,18 85,4 Z" fill="#57e3ff" opacity="0.85"/>
+
+  <!-- side ear guards -->
+  <path d="M20,78 q-12,6 -8,28 q10,4 16,-6 Z" fill="url(#hHelm)" stroke="#5b6bb0" stroke-width="2"/>
+  <path d="M150,78 q12,6 8,28 q-10,4 -16,-6 Z" fill="url(#hHelm)" stroke="#5b6bb0" stroke-width="2"/>
+
+  <!-- visor recess -->
+  <path d="M34,72 Q85,54 136,72 L128,104 Q85,120 42,104 Z"
+        fill="url(#hVisor)" stroke="#3a4274" stroke-width="2"/>
+
+  <!-- glowing eyes -->
+  <path d="M50,86 L74,80 L72,94 L52,98 Z" fill="url(#hEye)"/>
+  <path d="M120,86 L96,80 L98,94 L118,98 Z" fill="url(#hEye)"/>
+
+  <!-- center brow seam -->
+  <path d="M85,58 L85,150" stroke="#57e3ff" stroke-width="2" opacity="0.35"/>
+  <!-- top highlight -->
+  <path d="M55,24 Q85,14 115,24" stroke="#8a96d6" stroke-width="4" fill="none" opacity="0.5" stroke-linecap="round"/>
+</svg>

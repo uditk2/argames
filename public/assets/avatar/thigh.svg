@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 88 200" width="88" height="200">
+  <defs>
+    <linearGradient id="thBody" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#101426"/>
+      <stop offset="0.45" stop-color="#262d50"/>
+      <stop offset="1" stop-color="#14182e"/>
+    </linearGradient>
+    <linearGradient id="thPlate" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#39416f"/>
+      <stop offset="1" stop-color="#1d2342"/>
+    </linearGradient>
+  </defs>
+
+  <!-- thigh body (hip -> knee) -->
+  <path d="M22,30 Q44,18 66,30 L60,176 Q44,188 28,176 Z"
+        fill="url(#thBody)" stroke="#5b6bb0" stroke-width="2.5"/>
+
+  <!-- hip joint cap -->
+  <ellipse cx="44" cy="28" rx="26" ry="20" fill="url(#thPlate)" stroke="#5b6bb0" stroke-width="2.5"/>
+
+  <!-- thigh plate -->
+  <path d="M30,56 Q44,48 58,56 L54,150 Q44,158 34,150 Z" fill="url(#thPlate)" opacity="0.85" stroke="#6b78c0" stroke-width="1.2"/>
+
+  <!-- cyan seam + highlight -->
+  <path d="M44,46 L44,168" stroke="#57e3ff" stroke-width="3" opacity="0.45" stroke-linecap="round"/>
+  <path d="M31,50 L34,168" stroke="#7a87c8" stroke-width="3.5" opacity="0.4" stroke-linecap="round"/>
+
+  <!-- knee joint -->
+  <circle cx="44" cy="178" r="15" fill="url(#thPlate)" stroke="#5b6bb0" stroke-width="2"/>
+</svg>

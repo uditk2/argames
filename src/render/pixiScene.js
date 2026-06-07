@@ -29,6 +29,8 @@ import { PLAYER_RENDER_MODE } from '../config/game.config.js';
 import { COLOR } from '../config/theme.js';
 import { drainFx } from '../engine/state.js';
 import { createSfx } from './sfx.js';
+import { createAvatarRig } from './avatarRig.js';
+import { createAvatarRigSprite } from './avatarRigSprite.js';
 
 const BG_URL = '/assets/backgrounds/Cloudy_Sky-Night_01-1024x512.png';
 
@@ -151,8 +153,14 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
   const tint = new Graphics();
   bgLayer.addChild(tint);
   // In webcam-fx we mostly want the video to read through; dim the bg hard so
-  // the night-sky doesn't paint over the live person.
-  bg.alpha = mode === 'webcam-fx' ? (demo ? 0.55 : 0.0) : 1;
+  // the night-sky doesn't paint over the live person. In 'avatar' mode the
+  // webcam stays visible but DIMMED behind the rigged fighter (the dimming is
+  // a dark tint applied in layout()), so keep the night-sky off the live feed
+  // with a camera, and show it faintly as a backdrop in demo mode.
+  bg.alpha =
+    mode === 'webcam-fx' ? (demo ? 0.55 : 0.0)
+    : mode === 'avatar' ? (demo ? 0.5 : 0.0)
+    : 1;
 
   // === PLAYER: 'sprite' (legacy static boxer) ============================
   let player = null;
@@ -197,6 +205,24 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
   const skeleton = new Graphics();
   skeleton.visible = mode === 'skeleton';
   playerLayer.addChild(skeleton);
+
+  // Rigged 2D fighter (avatar mode). Self-contained modules own their own
+  // container; we just add it to the player layer and feed it the pose each
+  // frame. Kept BELOW the ward so the shield arc draws on top.
+  //   - Preferred: the SVG cutout rig (render/avatarRigSprite.js) — a proper
+  //     good-looking puppet rigged to the pose.
+  //   - Fallback: the vector capsule rig (render/avatarRig.js) — used only if
+  //     the SVG art fails to load, so the player always sees *a* fighter.
+  let avatarRig = null;
+  if (mode === 'avatar') {
+    try {
+      avatarRig = await createAvatarRigSprite({ COLOR });
+    } catch (e) {
+      console.warn('[pixiScene] SVG avatar rig failed; using vector fallback:', e);
+      avatarRig = createAvatarRig({ COLOR });
+    }
+    playerLayer.addChild(avatarRig.root);
+  }
 
   // Live pose overlay (webcam-fx mode). Inserted LOW in the player layer (just
   // above the aura, below the fist orbs) so the glowing fists still pop on top.
@@ -260,7 +286,13 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
     bg.y = (H - bg.texture.height * scale) / 2;
 
     tint.clear();
-    if (mode === 'webcam-fx') {
+    if (mode === 'avatar') {
+      // Dim the live webcam hard so the rigged fighter pops in front of it,
+      // with a faint magical wash + floor gradient for depth.
+      tint.rect(0, 0, W, H).fill({ color: COLOR.realm, alpha: demo ? 0.5 : 0.62 });
+      tint.rect(0, 0, W, H).fill({ color: COLOR.realmTint, alpha: 0.12 });
+      tint.rect(0, H * 0.72, W, H * 0.28).fill({ color: 0x3a0a1e, alpha: 0.22 });
+    } else if (mode === 'webcam-fx') {
       // Light magical vignette so the live video reads as the "demon realm"
       // without hiding the player.
       tint.rect(0, 0, W, H).fill({ color: COLOR.realmTint, alpha: demo ? 0.28 : 0.16 });
@@ -590,6 +622,7 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
 
     // --- PLAYER ---
     if (mode === 'sprite') renderSpritePlayer(state, now);
+    else if (mode === 'avatar') renderAvatarPlayer(state, now);
     else renderPosePlayer(state, now);
 
     // --- Player move notifications -> FX (after pose so positions are fresh) -
@@ -670,6 +703,20 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
       player.scale.set(targetH / (player.texture.height || targetH));
     }
     player.alpha = now < state.stunnedUntil ? 0.6 : 1;
+  }
+
+  // --- Rigged vector-fighter player (avatar mode) ---
+  // Delegates ALL drawing to the self-contained avatarRig module; this just
+  // hands it the per-frame context (pose mapper, sizing, combat flags) and
+  // remembers the glove positions so punch bursts can anchor to the fists.
+  function renderAvatarPlayer(state, now) {
+    if (!avatarRig) return;
+    const energetic = now < state.lastKillAt + 200;
+    avatarRig.draw(pose, {
+      px, visible, dims, now,
+      shielding: !!state.shielding,
+      energetic,
+    });
   }
 
   // --- Pose-tracked player (webcam-fx + skeleton) ---
@@ -803,8 +850,12 @@ export async function createPixiScene(mount, { avatarId, playerRenderMode, demo 
         // which the detector reports in mirrored display space.
         const side = m.payload && m.payload.side;
         let pos = null;
+        const rigWrist = (side && avatarRig) ? avatarRig.wrists()[side] : null;
         if (side && fists && fists[side] && fists[side].visible) {
           pos = { x: fists[side].x, y: fists[side].y };
+        } else if (rigWrist) {
+          // avatar mode: anchor the burst to the rigged glove.
+          pos = { x: rigWrist.x, y: rigWrist.y };
         } else if (m.payload && m.payload.x != null) {
           pos = { x: m.payload.x * dims.W, y: m.payload.y * dims.H };
         }

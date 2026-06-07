@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 84 210" width="84" height="210">
+  <defs>
+    <linearGradient id="faBody" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#12162a"/>
+      <stop offset="0.45" stop-color="#2a3158"/>
+      <stop offset="1" stop-color="#161a30"/>
+    </linearGradient>
+    <radialGradient id="faGlove" cx="0.5" cy="0.45" r="0.55">
+      <stop offset="0" stop-color="#ffe7a8"/>
+      <stop offset="0.45" stop-color="#ff8a3c"/>
+      <stop offset="1" stop-color="#c43a12"/>
+    </radialGradient>
+    <radialGradient id="faGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#ffb066" stop-opacity="0.8"/>
+      <stop offset="1" stop-color="#ff7a3c" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- forearm body (elbow -> wrist) -->
+  <path d="M26,40 Q42,32 58,40 L54,150 Q42,160 30,150 Z"
+        fill="url(#faBody)" stroke="#5b6bb0" stroke-width="2.5"/>
+
+  <!-- elbow cap -->
+  <ellipse cx="42" cy="36" rx="20" ry="15" fill="#2a3158" stroke="#5b6bb0" stroke-width="2"/>
+
+  <!-- bracer plate -->
+  <path d="M30,84 Q42,78 54,84 L52,140 Q42,146 32,140 Z" fill="#3a4274" opacity="0.85" stroke="#6b78c0" stroke-width="1.2"/>
+
+  <!-- cyan seam -->
+  <path d="M42,50 L42,144" stroke="#57e3ff" stroke-width="2.5" opacity="0.5" stroke-linecap="round"/>
+
+  <!-- energy glove (fist) -->
+  <circle cx="42" cy="178" r="40" fill="url(#faGlow)"/>
+  <circle cx="42" cy="178" r="29" fill="url(#faGlove)" stroke="#7a2a10" stroke-width="2"/>
+  <circle cx="42" cy="172" r="11" fill="#fff3d6" opacity="0.9"/>
+  <!-- knuckle ridges -->
+  <path d="M22,170 q20,-12 40,0" stroke="#7a2a10" stroke-width="2.5" fill="none" opacity="0.7"/>
+</svg>

@@ -19,20 +19,25 @@ export const DEFAULT_BODYWEIGHT_KG = 70;
 // How the *player* is drawn. The render layer (render/pixiScene.js) branches
 // on this so the live look can be swapped without rewriting the scene.
 //
-//   'webcam-fx' (DEFAULT) — the live, mirrored webcam fills the stage and the
-//                glowing energy effects (fist orbs, live pose-skeleton overlay,
-//                aura, punch bursts, shield arc) are tracked to the pose
-//                landmarks. This
-//                is the "it's really me" look. In demo mode (no camera) it
+//   'avatar' (DEFAULT) — a rigged 2D "sleek vector fighter" is drawn FROM the
+//                pose landmarks: head, tapered torso, capsule limbs and glowing
+//                energy gloves, all positioned/rotated to follow your tracked
+//                joints in real time so the character puppets YOUR movement.
+//                The live webcam is kept dimmed behind it for alignment. Works
+//                in demo mode too (the simulated pose drives the rig).
+//   'webcam-fx' — the live, mirrored webcam fills the stage and the glowing
+//                energy effects (fist orbs, live pose-skeleton overlay, aura,
+//                punch bursts, shield arc) are tracked to the pose landmarks.
+//                This is the "it's really me" look. In demo mode (no camera) it
 //                shows a dim silhouette placeholder + simulated moving fists.
 //   'skeleton'  — draws the live stick-figure straight from the landmarks over
 //                the webcam (debug / minimalist look).
 //   'sprite'    — the legacy static boxer-sprite path (a "skin" not rigged to
 //                pose). Kept for reference; no longer the default fighter.
-export const PLAYER_RENDER_MODES = ['webcam-fx', 'skeleton', 'sprite'];
+export const PLAYER_RENDER_MODES = ['avatar', 'webcam-fx', 'skeleton', 'sprite'];
 
 /** Active player render mode. Change this one value to switch the look. */
-export const PLAYER_RENDER_MODE = 'webcam-fx';
+export const PLAYER_RENDER_MODE = 'avatar';
 
 // --- Calorie model ---------------------------------------------------------
 // kcal = MET * 3.5 * weightKg / 200 (per minute), accumulated over elapsed time.
