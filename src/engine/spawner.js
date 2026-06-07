@@ -51,9 +51,10 @@ export function tickSpawner(state, sp, dtMs, now) {
     state.demons.length < spawn.maxConcurrentDemons
   ) {
     const type = pickDemonType();
+    const pa = state.config.playArea;
     const demon = createDemon(type, {
-      x: 0.15 + Math.random() * 0.7,
-      y: 0.12 + Math.random() * 0.4,
+      x: pa.xMin + Math.random() * (pa.xMax - pa.xMin),
+      y: pa.spawnYMin + Math.random() * (pa.spawnYMax - pa.spawnYMin),
     }, currentSpeedScale(state));
     state.demons.push(demon);
     sp.sinceDemonMs = 0;

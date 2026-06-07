@@ -57,6 +57,20 @@ export const SPAWN = {
   maxSpeedScale: 2.1,        // demon drift speed multiplier at peak
 };
 
+// --- Play area -------------------------------------------------------------
+// Normalized region of the webcam frame demons may occupy (0..1, where x grows
+// right and y grows down). Demons SPAWN within [xMin..xMax]×[spawnYMin..spawnYMax]
+// and are kept inside [xMin..xMax]×[yMin..yMax] as they drift. Widen these to
+// use more of the frame (right edge + lower body); the only reserved space is a
+// thin margin so demons never clip fully off-screen. The bottom-right replay
+// card is HUD (drawn on top), so demons there are fine.
+export const PLAY_AREA = {
+  xMin: 0.04, xMax: 0.96,      // full width (minus a thin margin)
+  yMin: 0.06, yMax: 0.92,      // top of head down to ~knees once stepped back
+  spawnYMin: 0.10,             // demons appear from near the top...
+  spawnYMax: 0.80,             // ...down through the torso so the lower frame is used
+};
+
 // --- Collision / hit feel --------------------------------------------------
 // A CONNECT requires a *punching* fist to overlap a demon's circular hitbox.
 export const COLLISION = {
@@ -90,6 +104,7 @@ export function makeRunConfig({ durationSec = DEFAULT_DURATION, bodyweightKg = D
     bodyweightKg,
     calories: CALORIES,
     spawn: SPAWN,
+    playArea: PLAY_AREA,
     collision: COLLISION,
     combo: COMBO,
     playerRenderMode: PLAYER_RENDER_MODE,

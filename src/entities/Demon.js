@@ -4,6 +4,8 @@
 // layer can map to whatever canvas size it has.
 // ===========================================================================
 
+import { PLAY_AREA } from '../config/game.config.js';
+
 let _id = 0;
 
 // Map a sprite diameter (px) to a normalized hit radius (fraction of stage
@@ -68,10 +70,12 @@ export function updateDemon(demon, dtMs) {
     if (Math.abs(demon.kby) < 1e-5) demon.kby = 0;
   }
 
-  // Keep demons loosely on-screen by bouncing horizontally.
-  if (demon.x < 0.08 || demon.x > 0.92) demon.vx *= -1;
-  demon.x = Math.min(0.95, Math.max(0.05, demon.x));
-  demon.y = Math.min(0.7, Math.max(0.08, demon.y));
+  // Keep demons inside the configured play area by bouncing off its edges.
+  const pa = PLAY_AREA;
+  if (demon.x < pa.xMin || demon.x > pa.xMax) demon.vx *= -1;
+  if (demon.y < pa.yMin || demon.y > pa.yMax) demon.vy *= -1;
+  demon.x = Math.min(pa.xMax, Math.max(pa.xMin, demon.x));
+  demon.y = Math.min(pa.yMax, Math.max(pa.yMin, demon.y));
 
   demon.frameTimer += dtMs;
   if (demon.frameTimer > 160) {

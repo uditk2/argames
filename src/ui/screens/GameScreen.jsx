@@ -24,6 +24,25 @@ import ScorePanel from '../hud/ScorePanel.jsx';
 import ComboMeter from '../hud/ComboMeter.jsx';
 import ReplayCard from '../hud/ReplayCard.jsx';
 
+// Landmarks that must all be in-frame for the player to count as "fully visible
+// to the knees": nose, both shoulders, both hips, both knees. (MediaPipe Pose.)
+const FRAME_REQUIRED = [0, 11, 12, 23, 24, 25, 26];
+const FRAME_MARGIN = 0.03;     // must sit this far inside each edge
+const FRAME_MIN_VIS = 0.5;     // landmark visibility threshold
+
+/** True when every required landmark is visible and inside the frame margins. */
+function isFramedToKnees(lm) {
+  if (!lm) return false;
+  for (const i of FRAME_REQUIRED) {
+    const p = lm[i];
+    if (!p) return false;
+    if (p.visibility != null && p.visibility < FRAME_MIN_VIS) return false;
+    if (p.x < FRAME_MARGIN || p.x > 1 - FRAME_MARGIN) return false;
+    if (p.y < FRAME_MARGIN || p.y > 1 - FRAME_MARGIN) return false;
+  }
+  return true;
+}
+
 export default function GameScreen({ settings, onFinish, onQuit }) {
   const mountRef = useRef(null);
   const videoRef = useRef(null);
@@ -33,11 +52,16 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
   const [hud, setHud] = useState({ timeLeftMs: settings.durationSec * 1000, progress: 0, score: 0, slain: 0, kcal: 0, combo: 0 });
   const [status, setStatus] = useState(demo ? 'ready' : 'starting'); // starting|ready|camera-error|loading-pose
   const [replaySupported, setReplaySupported] = useState(true);
+  // Pre-game framing gate (camera only). null once scoring has begun.
+  //   { phase: 'framing'|'countdown', ok: bool, count: number|null }
+  const [calib, setCalib] = useState(demo ? null : { phase: 'framing', ok: false, count: null });
 
   // Mutable refs that survive re-renders.
   const gameRef = useRef(null);
   const sceneRef = useRef(null);
   const replayRef = useRef(null);
+  const latestPoseRef = useRef(null); // most recent mirrored landmarks (for framing check)
+  const cameraFailedRef = useRef(false); // true if camera/pose unavailable (skip framing gate)
   const onFinishRef = useRef(onFinish);
   onFinishRef.current = onFinish;
 
@@ -107,9 +131,18 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
         await startPoseInput(bus, game);
       }
 
-      // 5) Start the game + main loop
-      game.start();
+      // 5) Main loop. In camera mode the timer/scoring stay paused until the
+      //    player is framed head-to-knees (a hard "step back" gate); demo mode
+      //    starts immediately. game.step() is a no-op until game.start() runs,
+      //    so the webcam + live skeleton still render during framing.
+      if (demo) game.start();
       let last = performance.now();
+      let framedSince = 0;       // when framing first became good (ms) | 0
+      let countdownUntil = 0;    // performance.now() target end of 3-2-1 | 0
+      let started = demo;        // scoring active?
+      const HOLD_MS = 1000;      // must stay framed this long before countdown
+      const COUNT_MS = 3000;     // 3-2-1 go
+
       const loop = () => {
         if (disposed) return;
         const now = performance.now();
@@ -123,6 +156,30 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
           const dp = makeDemoPose(now, game.state);
           scene.setPose(dp);
           feedFists(game, dp);
+        }
+
+        // --- Pre-game framing gate (camera only) ---------------------------
+        if (!started) {
+          if (cameraFailedRef.current) {
+            // No camera/pose: don't soft-lock — just begin.
+            game.start(); started = true; setCalib(null);
+          } else if (countdownUntil === 0) {
+            const ok = isFramedToKnees(latestPoseRef.current);
+            if (ok) {
+              if (!framedSince) framedSince = now;
+              if (now - framedSince >= HOLD_MS) countdownUntil = now + COUNT_MS;
+            } else {
+              framedSince = 0;
+            }
+            setCalib({ phase: 'framing', ok, count: null });
+          } else {
+            const remain = countdownUntil - now;
+            if (remain <= 0) {
+              game.start(); started = true; setCalib(null);
+            } else {
+              setCalib({ phase: 'countdown', ok: true, count: Math.ceil(remain / 1000) });
+            }
+          }
         }
 
         const finished = game.step(dt);
@@ -168,6 +225,7 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
         stream = await startCamera(videoRef.current);
       } catch (e) {
         console.warn('[GameScreen] camera denied/unavailable:', e);
+        cameraFailedRef.current = true; // skip the framing gate so we don't soft-lock
         setStatus('camera-error');
         return; // game still runs; pose simply never fires moves
       }
@@ -188,6 +246,7 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
           const mirrored = landmarks
             ? landmarks.map((p) => ({ ...p, x: 1 - p.x }))
             : null;
+          latestPoseRef.current = mirrored;
           if (sceneRef.current) sceneRef.current.setPose(mirrored);
           // Feed the live fist (wrist) positions into the engine so collision
           // can test them against demons. Detectors still gate "is this a punch".
@@ -199,6 +258,7 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
         setStatus('ready');
       } catch (e) {
         console.warn('[GameScreen] pose model failed to load:', e);
+        cameraFailedRef.current = true; // skip the framing gate so we don't soft-lock
         setStatus('camera-error');
       }
     }
@@ -350,10 +410,63 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
           </div>
         </div>
 
-        <Timer timeLeftMs={hud.timeLeftMs} progress={hud.progress} />
-        <ScorePanel score={hud.score} slain={hud.slain} kcal={hud.kcal} />
-        <ComboMeter combo={hud.combo} />
+        {/* Gameplay stats appear only once scoring has begun (after framing). */}
+        {!calib && (
+          <>
+            <Timer timeLeftMs={hud.timeLeftMs} progress={hud.progress} />
+            <ScorePanel score={hud.score} slain={hud.slain} kcal={hud.kcal} />
+            <ComboMeter combo={hud.combo} />
+          </>
+        )}
         <ReplayCard supported={replaySupported} />
+
+        {/* Pre-game framing gate: guide outline + "step back" prompt + 3-2-1. */}
+        {calib && status === 'ready' && (
+          <>
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <svg
+                className="h-[82%] transition-colors duration-300"
+                viewBox="0 0 100 150"
+                fill="none"
+                preserveAspectRatio="xMidYMid meet"
+              >
+                <g
+                  stroke={calib.ok ? '#7dffa0' : '#b079ff'}
+                  strokeWidth="1.4"
+                  strokeLinecap="round"
+                  strokeDasharray="4 3"
+                  opacity="0.9"
+                >
+                  <ellipse cx="50" cy="20" rx="12" ry="14" />
+                  <line x1="50" y1="34" x2="50" y2="92" />
+                  <line x1="50" y1="48" x2="24" y2="76" />
+                  <line x1="50" y1="48" x2="76" y2="76" />
+                  <line x1="50" y1="92" x2="36" y2="142" />
+                  <line x1="50" y1="92" x2="64" y2="142" />
+                </g>
+              </svg>
+            </div>
+            <div className="absolute left-1/2 -translate-x-1/2 bottom-[14%] flex flex-col items-center pointer-events-none">
+              {calib.phase === 'countdown' ? (
+                <div
+                  className="font-display font-black text-white"
+                  style={{ fontSize: 96, lineHeight: 1, textShadow: '0 2px 22px rgba(255,122,60,.85)' }}
+                >
+                  {calib.count}
+                </div>
+              ) : (
+                <div className="panel px-6 py-3 text-center max-w-[420px]">
+                  <div className="text-base font-semibold text-ink">
+                    {calib.ok ? 'Hold it…' : 'Step back so your whole body is in frame'}
+                  </div>
+                  <div className={`text-[12px] mt-1 ${calib.ok ? 'text-shield' : 'text-magic/70'}`}>
+                    {calib.ok ? "You're fully visible — get ready" : 'Move back until your head, arms and knees all show'}
+                  </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
 
         {/* Quit */}
         <button
