@@ -5,14 +5,16 @@
 // ===========================================================================
 
 import React, { useState, useCallback } from 'react';
+import HomeScreen from './screens/HomeScreen.jsx';
 import StartScreen from './screens/StartScreen.jsx';
 import GameScreen from './screens/GameScreen.jsx';
 import ResultsScreen from './screens/ResultsScreen.jsx';
+import VersusScreen from './screens/VersusScreen.jsx';
 import { DEFAULT_DURATION, DEFAULT_BODYWEIGHT_KG } from '../config/game.config.js';
 import { DEFAULT_AVATAR_ID } from '../config/avatars.js';
 
 export default function App() {
-  const [screen, setScreen] = useState('start'); // 'start' | 'game' | 'results'
+  const [screen, setScreen] = useState('home'); // 'home' | 'start' | 'game' | 'results' | 'versus'
   const [settings, setSettings] = useState({
     durationSec: DEFAULT_DURATION,
     bodyweightKg: DEFAULT_BODYWEIGHT_KG,
@@ -43,9 +45,13 @@ export default function App() {
   }, []);
 
   const playAgain = useCallback(() => setScreen('start'), []);
+  const goHome = useCallback(() => setScreen('home'), []);
 
   return (
     <div className="w-screen h-screen overflow-hidden bg-realm text-ink">
+      {screen === 'home' && (
+        <HomeScreen onSolo={() => setScreen('start')} onVersus={() => setScreen('versus')} />
+      )}
       {screen === 'start' && (
         <StartScreen initial={settings} onStart={startGame} />
       )}
@@ -54,6 +60,9 @@ export default function App() {
       )}
       {screen === 'results' && results && (
         <ResultsScreen results={results} clip={clip} onPlayAgain={playAgain} />
+      )}
+      {screen === 'versus' && (
+        <VersusScreen onQuit={goHome} />
       )}
     </div>
   );
