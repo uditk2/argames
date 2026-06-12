@@ -4,10 +4,10 @@
 // Canvas-2D rendering (the PoC look), React only for screens/HUD/overlays.
 // ===========================================================================
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { LEVELS, DEFAULT_LEVEL } from '../config.js';
+import { LEVELS, DEFAULT_LEVEL, RUNNER_IDLE_FRAME, RUNNER_OFF_DIST, RUNNER_RUN_START, RUNNER_RUN_LEN } from '../config.js';
 import { createRunDetector, framed, playerMetrics } from '../vision/runDetector.js';
 import { createPoseSource } from '../vision/poseSource.js';
-import { createPlayerCutout } from '../vision/cutout.js';
+import { createRunner } from '../render/runner.js';
 import { createSurvival } from '../engine/survival.js';
 import { createScene } from '../render/scene.js';
 import { loadAssets } from '../render/assets.js';
@@ -19,9 +19,10 @@ import { getName, setName, getCountry, setCountry as persistCountry, flagEmoji }
 import Leaderboard from '../../../ui/Leaderboard.jsx';
 
 export default function DinoSurvival({ onExit }) {
-  const canvasRef = useRef(null), videoRef = useRef(null), caughtVideoRef = useRef(null), G = useRef({});
+  const canvasRef = useRef(null), videoRef = useRef(null), caughtVideoRef = useRef(null), escapeVideoRef = useRef(null), G = useRef({});
+  const assetsRef = useRef(null);   // cache loaded images across runs (avoid re-decoding ~50MB every game)
   const [screen, setScreen] = useState('intro');         // intro | loading | playing | result
-  const [level, setLevel] = useState(DEFAULT_LEVEL);
+  const [level] = useState(DEFAULT_LEVEL);   // single difficulty (Impossible)
   const [hud, setHud] = useState({ t: 0, pace: 0, spm: 0, distPct: 0 });
   const [calib, setCalib] = useState(null);              // { msg, sub, ok } | null
   const [legsWarn, setLegsWarn] = useState(false);
@@ -31,6 +32,8 @@ export default function DinoSurvival({ onExit }) {
   const [clip, setClip] = useState(null);
   const [note, setNote] = useState('');
   const [dbg, setDbg] = useState(null);                  // telemetry/debug readout (null = off)
+  const [keepRun, setKeepRun] = useState(false);         // "keep running!" nudge (off-pose / stopped mid-chase)
+  const [analytics, setAnalytics] = useState(null);      // post-run analytics card data
   const [name, setNameState] = useState(() => getName());     // player display name (cookie-backed)
   const [country, setCountry] = useState(() => getCountry());  // ISO-2, detected at play start
   const [showBoard, setShowBoard] = useState(false);           // leaderboard overlay on intro
@@ -41,8 +44,10 @@ export default function DinoSurvival({ onExit }) {
     const g = G.current; if (!g) return;
     if (g.raf) cancelAnimationFrame(g.raf);
     if (g.demoTimer) clearInterval(g.demoTimer);
-    if (g.caughtTimer) clearTimeout(g.caughtTimer);
+    if (g.csTimer) clearTimeout(g.csTimer);
+    if (g.clipUrl) { try { URL.revokeObjectURL(g.clipUrl); } catch {} }   // free the previous run's replay blob
     try { caughtVideoRef.current && caughtVideoRef.current.pause(); } catch {}
+    try { escapeVideoRef.current && escapeVideoRef.current.pause(); } catch {}
     try { g.pose && g.pose.dispose(); } catch {}
     try { g.replay && g.replay.stop(); } catch {}
     if (g.onKey) window.removeEventListener('keydown', g.onKey);
@@ -67,15 +72,20 @@ export default function DinoSurvival({ onExit }) {
 
   async function startGame(mode) {
     teardown(); setScreen('loading'); setNote(''); setResult(null); setClip(null);
-    const assets = await loadAssets();
+    // load assets ONCE and reuse across runs (re-decoding ~97 images each game was
+    // churning ~50MB of bitmaps — a likely cause of cross-run memory pressure).
+    if (!assetsRef.current) assetsRef.current = await loadAssets();
+    const assets = assetsRef.current;
     const cv = canvasRef.current; const ctx = cv.getContext('2d');
     const fit = () => { cv.width = window.innerWidth; cv.height = window.innerHeight; }; fit();
-    const det = createRunDetector(), surv = createSurvival(LEVELS[level]), scene = createScene(assets), cutout = createPlayerCutout();
+    const det = createRunDetector(), surv = createSurvival(LEVELS[level]), scene = createScene(assets), runner = createRunner(assets, RUNNER_IDLE_FRAME);
     let phase = mode === 'camera' ? 'calibrating' : 'countdown';
-    let countTo = 0, calStart = 0, lastT = performance.now(), camNear = 0, bgPos = 0, escDone = false;
+    let countTo = 0, calStart = 0, lastT = performance.now(), camNear = 0, bgPos = 0, runnerPos = 0, escDone = false;
+    let spmSum = 0, spmSqSum = 0, spmCnt = 0, spmMax = 0, activeMs = 0, calAccum = 0; const WEIGHT_KG = 70;  // for analytics (avg/peak cadence, consistency, calories)
+    let frameCnt = 0, tAcc = 0;   // for the downloadable telemetry trace (diagnosing detection failures)
     let latestLM = null, latestVid = null, latestMask = null, pm = null, pace = 0, spm = 0, buildTick = 0;
 
-    const g = G.current = { mode, ctx, cv, det, surv, scene, cutout, fit };
+    const g = G.current = { mode, ctx, cv, det, surv, scene, runner, fit, assets, tlog: [] };
     window.addEventListener('resize', fit);
 
     // pose / demo input
@@ -84,8 +94,7 @@ export default function DinoSurvival({ onExit }) {
         const pose = createPoseSource(videoRef.current); g.pose = pose;
         await pose.startCamera(); await pose.init();
         pose.start((lm, vid, mask) => {
-          latestLM = lm; latestVid = vid; latestMask = mask;
-          if (mask && vid && buildTick++ % 2 === 0) cutout.build(vid, mask);   // rebuild cutout at ~half rate (frees CPU)
+          latestLM = lm; latestVid = vid;   // segmentation removed — avatar is a baked sprite now
           if (phase === 'calibrating') {
             if (framed(lm)) { if (!calStart) calStart = performance.now(); det.calibrate(lm);
               setCalib({ msg: 'Stand tall & still', sub: 'Capturing your standing pose…', ok: true });
@@ -107,6 +116,7 @@ export default function DinoSurvival({ onExit }) {
     // ground line / vanishing point live; [ ] shift the background vertical anchor.
     const dbgKey = (e) => {
       const k = e.key.toLowerCase();
+      if (k === 't') { downloadTelemetry(); return; }   // grab the trace anytime (even if detection died)
       if (k === 'g') { g.debug = !g.debug; scene.setDebug(g.debug); if (!g.debug) setDbg(null); return; }
       if (!g.debug) return;
       const gr = scene.getGround();
@@ -138,10 +148,17 @@ export default function DinoSurvival({ onExit }) {
       if (phase === 'countdown' && countTo - now <= 0) { phase = 'running'; }
       if (phase === 'running' && legsOK) {
         const s = surv.step(pace, dt);
-        if (s.phase === 'escaped') { phase = 'escaped'; scene.beginEscape(now); }
+        if (s.phase === 'escaped') { phase = 'escaped'; playEscape(); }
         else if (s.phase === 'caught') { phase = 'caught'; playCaught(); }
       }
       const snap = surv.snapshot();
+      let keepRunWarn = false;
+      // accumulate run analytics while actually running
+      if (phase === 'running') {
+        if (spm > 0) { spmSum += spm; spmSqSum += spm * spm; spmCnt++; if (spm > spmMax) spmMax = spm; activeMs += dt; }
+        const met = Math.max(3, Math.min(12, 3 + spm * 0.045));                 // high-knees MET scales with cadence
+        calAccum += met * 3.5 * WEIGHT_KG / 200 * (dt / 60000);                 // kcal = MET·3.5·kg/200 per min
+      }
 
       // ---- render ----
       // Whole-frame car-cam carries the motion (jeep ahead, looking back). pace
@@ -153,18 +170,24 @@ export default function DinoSurvival({ onExit }) {
       bgPos += pace * dt * 0.012;
       const groundY = scene.drawBgSeq(ctx, W, H, bgPos);   // float pos -> crossfaded frames (smooth + seamless wrap)
       if (phase === 'escaped') {
-        const done = scene.drawEscape(ctx, W, H, groundY, now, cutout, pm);
-        if (done && !escDone) { escDone = true; finish(); }
+        // fullscreen escape video handles the win cutscene (loop stops below)
       } else {
         const near = scene.drawDino(ctx, W, H, groundY, snap.gap, now);
         camNear += (near - camNear) * 0.12;                 // smoothed closeness for the camera
-        // Player: live segmentation cutout + rig overlay. We know the composite
-        // looks pasted-on (different light/perspective from the painted scene) and
-        // will replace it with the Grok-learned avatar — but keep it visible for
-        // now so tracking is verifiable. Rig toggles via the HUD button.
-        if (cutout.has()) { cutout.draw(ctx, W, H, groundY, pm, 1, 0.5); if (showRig) cutout.drawRig(ctx, W, H, groundY, pm, lm); }
-        else scene.drawSilhouette(ctx, W, H, groundY, pace, now);
-        // (side foliage props removed — they showed hard rectangular edges.)
+        // Player avatar. While RUNNING, the cycle advances with your pace — the SAME
+        // measure that drives the ground — so the runner always moves in lockstep
+        // with the world. While idle, we pose-match your live skeleton (arms/standing
+        // follow you), falling back to standing if the pose is off (ducking/arbitrary).
+        let rIdx, offPose = false;
+        if (pace > 0.05) { runnerPos += pace * dt * 0.012; rIdx = RUNNER_RUN_START + (runnerPos % RUNNER_RUN_LEN); }   // seamless single-stride loop, ~natural rate
+        else if (mode === 'camera' && lm) {
+          rIdx = runner.pickFrame(lm);
+          if (runner.matchDist() > RUNNER_OFF_DIST) { rIdx = RUNNER_IDLE_FRAME; offPose = true; }
+        } else rIdx = RUNNER_IDLE_FRAME;
+        scene.drawDust(ctx, W, H, groundY, pace, now, dt);   // sand kicked up behind the runner
+        runner.draw(ctx, W, H, groundY, rIdx, showRig);
+        // gentle nudge if you've stopped running mid-chase
+        keepRunWarn = phase === 'running' && mode === 'camera' && (offPose || spm === 0);
         if (near > 0.74) { ctx.fillStyle = `rgba(180,20,30,${(near - 0.74) * 0.8})`; ctx.fillRect(-20, -20, W + 40, H + 40); }
       }
       if (g.debug) scene.drawGuides(ctx, W, H);            // ground + vanishing-point guides (ride with the camera)
@@ -175,26 +198,41 @@ export default function DinoSurvival({ onExit }) {
       // speed lines stream in screen space, on top of the moving frame (top-speed accent).
       if (phase !== 'escaped') scene.drawSpeedLines(ctx, W, H, pace, now);
 
-      hudAcc += dt; if (hudAcc > 100) { hudAcc = 0; setHud({ t: snap.t, pace, spm, distPct: snap.distPct });
+      hudAcc += dt; if (hudAcc > 100) { hudAcc = 0; setHud({ t: snap.t, pace, spm, distPct: snap.distPct }); setKeepRun(keepRunWarn);
         if (g.debug) { const gr = scene.getGround(); const nF = (assets.bgLoop && assets.bgLoop.length) || 1;
-          setDbg({ pace: +pace.toFixed(2), spm, gap: +snap.gap.toFixed(2), near: +camNear.toFixed(2), dist: Math.round(snap.distPct * 100),
+          setDbg({ pace: +pace.toFixed(2), spm, band: c.band, steps: c.steps, flash: c.flash, md: +runner.matchDist().toFixed(1), gap: +snap.gap.toFixed(2), near: +camNear.toFixed(2), dist: Math.round(snap.distPct * 100),
             bg: Math.floor(bgPos) % nF, legs: (mode !== 'camera' || framed(lm)), phase,
             g: gr.gFrac.toFixed(2), t: gr.tFrac.toFixed(2), a: gr.bgAnchor.toFixed(2) }); }
       }
 
-      if (phase !== 'caught' && phase !== 'done') g.raf = requestAnimationFrame(loop);
+      // ---- telemetry trace (1 sample/sec): fps, pose errors, heap, cadence ----
+      frameCnt++; tAcc += dt;
+      if (tAcc >= 1000) {
+        g.tlog.push({ ms: Math.round(now), t: +snap.t.toFixed(1), phase, fps: Math.round(frameCnt * 1000 / tAcc),
+          pace: +pace.toFixed(2), spm, steps: c.steps, lm: lm ? 1 : 0, framed: (mode !== 'camera' || framed(lm)) ? 1 : 0,
+          mv: c.diag?.mv, lL: c.diag?.lL, lR: c.diag?.lR, gL: c.diag?.gL, gR: c.diag?.gR,
+          poseErr: (g.pose && g.pose.errors) ? g.pose.errors() : 0,
+          heapMB: (performance.memory) ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null });
+        if (g.tlog.length > 1800) g.tlog.shift();   // cap ~30min
+        frameCnt = 0; tAcc = 0;
+      }
+
+      if (phase !== 'caught' && phase !== 'escaped' && phase !== 'done') g.raf = requestAnimationFrame(loop);
     };
 
-    // Caught -> play the dino-capture sting fullscreen, THEN show the result.
-    function playCaught() {
-      const v = caughtVideoRef.current;
+    // Generic: play a fullscreen cutscene video, then finish() -> result screen.
+    function playCutscene(v, screenName, safetyMs) {
       if (!v) { finish(); return; }
-      setScreen('caught');
-      const done = () => { v.removeEventListener('ended', done); if (G.current.caughtTimer) clearTimeout(G.current.caughtTimer); finish(); };
+      setScreen(screenName);
+      const done = () => { v.removeEventListener('ended', done); if (G.current.csTimer) clearTimeout(G.current.csTimer); finish(); };
       v.addEventListener('ended', done);
       try { v.currentTime = 0; const p = v.play(); if (p && p.catch) p.catch(() => done()); } catch { done(); }
-      G.current.caughtTimer = setTimeout(done, 5200);   // safety if 'ended' doesn't fire
+      G.current.csTimer = setTimeout(done, safetyMs);
     }
+    function playEscape() { playCutscene(escapeVideoRef.current, 'escaped', 5400); }   // clip ~4.83s
+
+    // Caught -> play the dino lunge/capture sting fullscreen, THEN show the result.
+    function playCaught() { playCutscene(caughtVideoRef.current, 'caught', 5600); }   // catch clip ~5.1s (chase -> lunge -> grab)
 
     function finish() {
       if (G.current.finished) return; G.current.finished = true;
@@ -214,11 +252,36 @@ export default function DinoSurvival({ onExit }) {
           setResult((prev) => (prev === r ? { ...r, isNew: srv.isPB } : prev));
         });
       let cl = null; try { cl = G.current.replay && G.current.replay.getLastClip(); G.current.replay && G.current.replay.stop(); } catch {}
-      setClip(cl || null);
+      setClip(cl || null); G.current.clipUrl = cl ? cl.url : null;   // tracked so we can revoke it next run (off-heap blob leak)
+      // ---- run analytics ----
+      const st = det.stats(); const totLR = st.stepsL + st.stepsR;
+      const avgCad = spmCnt ? Math.round(spmSum / spmCnt) : 0;
+      const varc = spmCnt ? Math.max(0, spmSqSum / spmCnt - (spmSum / spmCnt) ** 2) : 0;
+      setAnalytics({
+        avgCad, peakCad: spmMax,
+        consistency: avgCad ? Math.round(Math.max(0, 1 - Math.sqrt(varc) / avgCad) * 100) : 0,
+        symL: totLR ? Math.round((st.stepsL / totLR) * 100) : 50,
+        steps: st.steps, cals: Math.round(calAccum), activeS: Math.round(activeMs / 1000),
+      });
       phase = 'done'; setScreen('result');
     }
 
     g.raf = requestAnimationFrame(loop);
+  }
+
+  // ---- telemetry export (diagnostics) ----
+  function downloadTelemetry() {
+    const g = G.current || {}; const tlog = g.tlog || [];
+    const payload = {
+      when: new Date().toISOString(), ua: navigator.userAgent,
+      hasMemAPI: !!performance.memory,
+      lastPoseErr: (g.pose && g.pose.lastError) ? g.pose.lastError() : '',
+      poseErrTotal: (g.pose && g.pose.errors) ? g.pose.errors() : 0,
+      samples: tlog,
+    };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = 'slayfit-dino-telemetry.json'; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
   }
 
   // ---- share helpers ----
@@ -241,7 +304,11 @@ export default function DinoSurvival({ onExit }) {
     g.fillStyle = '#ff7a3c'; g.font = '800 40px system-ui'; g.fillText('outrun the beast · slayfit', 540, 980);
     c.toBlob(b => dlOrShare(b, 'slayfit-dino-survival.png', 'SlayFit Dino Survival'), 'image/png');
   }
-  function shareClip() { if (!clip || !clip.blob) return; dlOrShare(clip.blob, 'slayfit-dino-survival.webm', 'My Dino Survival run'); }
+  function shareClip() {
+    if (!clip || !clip.blob) return;
+    const ext = ((clip.mime || clip.blob.type || '').includes('mp4')) ? 'mp4' : 'webm';   // mp4 where the browser recorded it
+    dlOrShare(clip.blob, `slayfit-dino-survival.${ext}`, 'My Dino Survival run');
+  }
 
   const lvl = LEVELS[level];
 
@@ -251,16 +318,24 @@ export default function DinoSurvival({ onExit }) {
       <img src="/assets/dino-survival/bg/trail.png" alt="" className="absolute inset-0 w-full h-full object-cover" />
       <div className="absolute inset-0 bg-gradient-to-b from-[rgb(var(--realm-rgb)/.45)] via-[rgb(var(--realm-rgb)/.78)] to-[rgb(var(--realm-rgb)/.96)]" />
       <video ref={videoRef} playsInline muted className="absolute -left-[9999px] -top-[9999px]" />
-      {/* caught cutscene: dino capture sting, shown only while screen === 'caught' */}
+      {/* caught cutscene: dino capture sting — fades in over the cut, and stays frozen
+          on its last frame as the result backdrop when you were caught. */}
       <video ref={caughtVideoRef} src="/assets/dino-survival/cut/caught.mp4" playsInline muted preload="auto"
-        className={`absolute inset-0 w-full h-full object-cover bg-black z-[15] ${screen === 'caught' ? '' : 'hidden'}`} />
+        className="absolute inset-0 w-full h-full object-cover bg-black z-[15]"
+        style={{ opacity: (screen === 'caught' || (screen === 'result' && result && !result.escaped)) ? 1 : 0, transform: (screen === 'caught' || (screen === 'result' && result && !result.escaped)) ? 'scale(1)' : 'scale(0.93)', transformOrigin: 'center 45%', transition: 'opacity .3s ease, transform .4s ease', pointerEvents: 'none' }} />
+      {/* escape cutscene: jeep getaway — fades in, then freezes on its last frame as
+          the result backdrop when you escaped. */}
+      <video ref={escapeVideoRef} src="/assets/dino-survival/cut/escaped.mp4" playsInline muted preload="auto"
+        className="absolute inset-0 w-full h-full object-cover bg-black z-[15]"
+        style={{ opacity: (screen === 'escaped' || (screen === 'result' && result && result.escaped)) ? 1 : 0, transform: (screen === 'escaped' || (screen === 'result' && result && result.escaped)) ? 'scale(1)' : 'scale(0.9)', transformOrigin: 'center center', transition: 'opacity .3s ease, transform .45s ease', pointerEvents: 'none' }} />
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />
 
       {/* telemetry / grounding tuner (toggle with 'G') */}
       {dbg && (
         <div className="absolute bottom-3 left-3 z-[20] font-mono text-[11px] leading-relaxed text-emerald-200 bg-black/70 border border-emerald-400/30 rounded-lg px-3 py-2 pointer-events-none">
           <div className="text-emerald-300 font-bold mb-1">TELEMETRY · {dbg.phase}</div>
-          <div>pace {dbg.pace} · spm {dbg.spm} · legs {dbg.legs ? 'OK' : '—'}</div>
+          <div>pace {dbg.pace} · spm {dbg.spm} · <span className={dbg.flash ? 'text-yellow-300' : ''}>{dbg.band}</span></div>
+          <div>steps {dbg.steps} · legs {dbg.legs ? 'OK' : '— STEP BACK'} · poseΔ {dbg.md}</div>
           <div>gap {dbg.gap} · near {dbg.near} · dist {dbg.dist}% · bg#{dbg.bg}</div>
           <div className="text-cyan-300 mt-1">gFrac {dbg.g} [↑↓] · tFrac {dbg.t} [←→] · bgAnchor {dbg.a} [ [ ] ]</div>
           <div className="text-white/50 mt-1">G to toggle</div>
@@ -279,6 +354,16 @@ export default function DinoSurvival({ onExit }) {
             <div className="font-black text-3xl text-gold tabular-nums text-glow">{hud.t.toFixed(1)}</div>
             <div className="text-[9px] tracking-[0.22em] uppercase text-ink/80">seconds</div>
           </div>
+          {/* live cadence coach — centered + large so you can read it while running */}
+          {hud.spm > 0 && (
+            <div className="absolute top-[62%] left-1/2 -translate-x-1/2 -translate-y-1/2 z-[5]" style={{ textShadow: '0 2px 10px #000' }}>
+              <div className={`text-xl md:text-2xl font-extrabold px-6 py-2.5 rounded-full border-2 backdrop-blur-sm ${hud.spm >= 170 ? 'text-emerald-200 border-emerald-400/70 bg-emerald-500/25'
+                : hud.spm >= 145 ? 'text-amber-100 border-amber-300/60 bg-amber-500/25'
+                : 'text-white border-fire/70 bg-fire/30'}`}>
+                {hud.spm >= 170 ? `cadence ✓ ${hud.spm}` : hud.spm >= 145 ? `↑ faster · ${hud.spm}` : `lift your knees · ${hud.spm}`}
+              </div>
+            </div>
+          )}
           <div className="absolute top-3 right-3.5 flex gap-2 z-[5]">
             <Stat v={Math.round(hud.pace * 100) + '%'} k="pace" /><Stat v={hud.spm} k="spm" />
           </div>
@@ -293,16 +378,20 @@ export default function DinoSurvival({ onExit }) {
           </div>
           <button onClick={() => setShowRig(r => !r)} className="absolute top-12 left-4 z-[6] pointer-events-auto cursor-pointer panel px-2.5 py-1 text-[11px] font-bold text-ink/90">{showRig ? 'rig: on' : 'rig: off'}</button>
           {legsWarn && (
-            <div className="absolute left-1/2 top-[58%] -translate-x-1/2 -translate-y-1/2 z-[6] text-center rounded-xl px-4 py-2.5 font-extrabold text-white border border-fire/60" style={{ background: 'rgb(var(--fire-rgb)/.85)' }}>
-              Step back — get your knees &amp; feet in frame
-              <div className="text-[11px] font-medium opacity-90 mt-0.5">the detector can't read your stride otherwise</div>
+            <div className="absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 z-[6] text-center rounded-2xl px-7 py-4 text-2xl md:text-3xl font-extrabold text-white border-2 border-fire/70" style={{ background: 'rgb(var(--fire-rgb)/.9)', textShadow: '0 2px 10px #000' }}>
+              Step back<div className="text-base md:text-lg font-semibold opacity-90 mt-1">get your knees &amp; feet in frame</div>
+            </div>
+          )}
+          {keepRun && !legsWarn && (
+            <div className="absolute left-1/2 top-[42%] -translate-x-1/2 -translate-y-1/2 z-[6] text-center rounded-2xl px-8 py-5 text-3xl md:text-4xl font-extrabold text-white border-2 border-magic/70 animate-pulse" style={{ background: 'rgb(var(--fire-rgb)/.85)', textShadow: '0 2px 10px #000' }}>
+              Keep running! 🦖
             </div>
           )}
           {calib && (
-            <div className="absolute left-1/2 bottom-[14%] -translate-x-1/2 text-center z-[6]">
-              <div className="panel px-5 py-3">
-                <div className="text-base font-bold text-ink">{calib.msg}</div>
-                <div className={`text-xs mt-0.5 ${calib.ok ? 'text-shield' : 'text-magic/70'}`}>{calib.sub}</div>
+            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center z-[6]">
+              <div className="panel px-8 py-5">
+                <div className="text-2xl md:text-3xl font-extrabold text-ink">{calib.msg}</div>
+                <div className={`text-base md:text-lg mt-1 ${calib.ok ? 'text-shield' : 'text-magic/70'}`}>{calib.sub}</div>
               </div>
             </div>
           )}
@@ -353,15 +442,9 @@ export default function DinoSurvival({ onExit }) {
             {country ? <>Running for {flagEmoji(country)} {country} · saved on this device</> : 'Detecting your realm…'}
           </p>
 
-          <div className="text-[11px] tracking-[0.16em] uppercase text-magic/80 mt-3 mb-2">Difficulty</div>
-          <div className="flex gap-2 justify-center flex-wrap mb-4">
-            {Object.values(LEVELS).map(L => (
-              <button key={L.key} onClick={() => setLevel(L.key)}
-                className={`px-4 py-2 rounded-xl text-sm font-semibold border transition ${level === L.key ? 'bg-magic/30 border-magic text-white shadow-glow' : 'bg-realm/40 border-magic/30 text-ink/80 hover:border-magic/60'}`}>{L.label}</button>
-            ))}
-          </div>
+          <div className="mb-4" />
           {screen === 'loading'
-            ? <p className="text-magic/80 text-[13px]">Summoning the oracle… loading pose + segmentation</p>
+            ? <p className="text-magic/80 text-[13px]">Summoning the oracle… loading pose tracking</p>
             : (<div className="space-y-2">
                 <button
                   onClick={() => { if (!name.trim()) { setNote('Name your adventurer first.'); return; } setName(name); startGame('camera'); }}
@@ -391,6 +474,27 @@ export default function DinoSurvival({ onExit }) {
           </div>
           {result.isNew && <p className="text-gold font-extrabold mb-1.5">New personal best!</p>}
 
+          {/* Run analytics — cadence is the metric that improves running performance. */}
+          {analytics && (
+            <div className="my-3 w-full max-w-[420px] mx-auto">
+              <div className="text-[11px] tracking-[0.2em] uppercase text-magic/70 mb-1.5">Run analytics</div>
+              <div className="grid grid-cols-3 gap-2">
+                <RC k="Avg cadence" v={analytics.avgCad + ' spm'} />
+                <RC k="Peak" v={analytics.peakCad + ' spm'} />
+                <RC k="Calories" v={'~' + analytics.cals} />
+                <RC k="L / R balance" v={analytics.symL + ' / ' + (100 - analytics.symL)} />
+                <RC k="Consistency" v={analytics.consistency + '%'} />
+                <RC k="Active" v={analytics.activeS + 's'} />
+              </div>
+              <p className="text-[11px] text-magic/70 mt-2 leading-relaxed">
+                {analytics.avgCad >= 170 ? 'Strong cadence — elite runners hold 170–180 spm.'
+                  : analytics.avgCad > 0 ? `Try ~${Math.min(180, analytics.avgCad + 5)} spm next run — +5 spm is ~5% more efficient for the same effort.`
+                  : 'Drive your knees higher to register a cadence.'}
+                {Math.abs(analytics.symL - 50) >= 8 && ` Your stride leaned ${analytics.symL > 50 ? 'left' : 'right'} (${analytics.symL}/${100 - analytics.symL}) — aim for even.`}
+              </p>
+            </div>
+          )}
+
           {/* Top escapes — preloaded from the submit response, so no extra call. */}
           {board && board.length > 0 && (
             <div className="my-3">
@@ -403,6 +507,7 @@ export default function DinoSurvival({ onExit }) {
             <button onClick={shareCard} className="px-4 py-2.5 rounded-xl font-semibold text-ink/90 bg-realm/50 border border-magic/30 hover:border-magic/60 transition">Share card</button>
             <button onClick={shareClip} disabled={!clip || !clip.blob} className="px-4 py-2.5 rounded-xl font-semibold text-ink/90 bg-realm/50 border border-magic/30 hover:border-magic/60 transition disabled:opacity-40">Share 10s clip</button>
             {onExit && <button onClick={onExit} className="px-4 py-2.5 rounded-xl font-semibold text-ink/80 bg-realm/50 border border-magic/30 hover:border-magic/60 transition">← Back</button>}
+            <button onClick={downloadTelemetry} title="download run telemetry (debug)" className="px-3 py-2.5 rounded-xl font-semibold text-ink/50 bg-realm/40 border border-magic/20 hover:border-magic/50 transition text-xs">⬇ telemetry</button>
           </div>
           {(!clip || !clip.blob) && <p className="text-[11px] text-magic/60 mt-2">clip capture unavailable on this browser</p>}
         </Center>
@@ -424,7 +529,7 @@ const RC = ({ k, v }) => (
   </div>
 );
 const Center = ({ children }) => (
-  <div className="absolute inset-0 z-[8] flex items-center justify-center p-4">
+  <div className="absolute inset-0 z-[20] flex items-center justify-center p-4">
     <div className="panel p-7 w-[min(94vw,520px)] text-center">{children}</div>
   </div>
 );

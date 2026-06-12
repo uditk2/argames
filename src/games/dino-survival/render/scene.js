@@ -1,17 +1,15 @@
 // ===========================================================================
 // Dino Survival — SCENE RENDERER (canvas 2D).
 // ---------------------------------------------------------------------------
-// Static trail backdrop + perspective scrolling ground (the forward-motion) +
-// the galloping, grounded dino + the jeep escape cutscene. Pure drawing; reads
-// the engine snapshot + the player cutout. No game logic here.
+// Distance-indexed trail-loop background + car-cam + the galloping, grounded
+// dino + kicked-up dust. Pure drawing; reads the engine snapshot. No game logic.
+// (Catch/escape are fullscreen video cutscenes handled in the UI, not here.)
 // ===========================================================================
 import { clamp, lerp } from '../util.js';
 import { GROUND_FRAC, TRAIL_TOP_FRAC } from '../config.js';
 
 export function createScene(assets) {
-  let escEnd = 0;
   let nearDisp = 0;   // smoothed closeness for rendering (damps fast gap changes so the dino never snaps in size)
-  let gtex = null;    // offscreen canvas for the feathered scrolling ground
   // tunable (debug-adjustable) ground geometry — fixes "floating in the sky" by
   // matching the engine's ground line + vanishing point to the actual bg art.
   let gFrac = 0.88;     // near ground (feet when close) as a fraction of H
@@ -19,6 +17,7 @@ export function createScene(assets) {
                         //   visible trail strip, not up in this bg's high canopy
   let bgAnchor = 0.72;  // vertical anchor for the portrait bg cover-fit (toward 1 = show foreground trail)
   let debug = false;
+  let dust = [], dustAcc = 0;   // sand/dust particles kicked up behind the runner
 
   // Distance-indexed BACKGROUND LOOP — the seamless forward-dolly trail frames.
   // `pos` (a float) is driven by accumulated distance: holding still freezes the
@@ -45,35 +44,6 @@ export function createScene(assets) {
     return H * gFrac;
   }
 
-  // perspective scrolling ground (mode-7 style): a dirt texture flows toward you.
-  function drawGround(ctx, W, H, scroll) {
-    const tex = assets.groundTex; if (!tex) return;
-    if (!gtex || gtex.width !== W || gtex.height !== H) { gtex = document.createElement('canvas'); gtex.width = W; gtex.height = H; }
-    const g = gtex.getContext('2d'); g.clearRect(0, 0, W, H);
-    const hy = H * TRAIL_TOP_FRAC, vx = W * 0.5, tw = tex.naturalWidth, th = tex.naturalHeight;
-    // mode-7 scroll: a dirt texture flowing toward the viewer (faster near you)
-    for (let y = Math.ceil(hy); y < H; y += 2) {
-      const f = (y - hy) / (H - hy);
-      const worldZ = 0.32 / Math.max(0.04, f);
-      const V = ((scroll * 0.55 + worldZ) % 1 + 1) % 1;
-      const w = lerp(W * 0.05, W * 0.78, f * f);          // stays on-screen (no overflow)
-      g.drawImage(tex, 0, V * th, tw, 1, vx - w / 2, y, w, 2);
-    }
-    // FEATHER edges so the moving ground blends into the painted trail (kills the
-    // hard wedge seam): fade alpha to 0 near the vanishing point and at the sides.
-    g.globalCompositeOperation = 'destination-in';
-    const vg = g.createLinearGradient(0, hy, 0, H);
-    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(0.18, 'rgba(0,0,0,.85)'); vg.addColorStop(1, 'rgba(0,0,0,1)');
-    g.fillStyle = vg; g.fillRect(0, hy, W, H - hy);
-    const hg = g.createLinearGradient(0, 0, W, 0);
-    hg.addColorStop(0, 'rgba(0,0,0,0)'); hg.addColorStop(0.24, 'rgba(0,0,0,1)'); hg.addColorStop(0.76, 'rgba(0,0,0,1)'); hg.addColorStop(1, 'rgba(0,0,0,0)');
-    g.fillStyle = hg; g.fillRect(0, hy, W, H - hy);
-    g.globalCompositeOperation = 'source-over';
-    // soft-light: the flowing texture modulates the painted trail's light/shadow
-    // (keeps its exact colour) instead of pasting a differently-toned patch.
-    ctx.save(); ctx.globalCompositeOperation = 'soft-light'; ctx.globalAlpha = 0.9; ctx.drawImage(gtex, 0, 0); ctx.restore();
-  }
-
   // Dino: ONE consistent image, animated procedurally (bound + squash-stretch +
   // gentle rock) so there's no frame-to-frame shimmer — smooth at any speed/size.
   // (Multi-frame cycling boiled worse as it sped up/scaled up; this fixes that.)
@@ -82,10 +52,13 @@ export function createScene(assets) {
     nearDisp += (nearTrue - nearDisp) * 0.18;          // ease toward target -> no size/position snapping
     const near = nearDisp;                              // smoothed value drives size + position
     const frames = (assets.dinoRunFrames && assets.dinoRunFrames.length) ? assets.dinoRunFrames : [];
-    // cycle the real (consistent) gallop frames — playback eases faster as it nears
-    const mspf = lerp(72, 46, clamp(near, 0, 1));
+    // cycle the real gallop frames at a CONSTANT cadence — only size/position change
+    // with distance (speeding the gait up as it neared looked weird).
+    const mspf = 60;
     const runIm = frames.length ? frames[Math.floor(now / mspf) % frames.length] : null;
-    const im = (nearTrue > 0.82 && assets.dinoLunge) ? assets.dinoLunge : (runIm || assets.dinoLunge);
+    // The dino just GALLOPS (growing) all the way to the catch — the lunge now lives
+    // entirely in the catch cutscene.
+    const im = runIm;
     if (!im) return nearTrue;
     const hy = H * tFrac;
     const f = Math.pow(near, 1.5);
@@ -108,6 +81,29 @@ export function createScene(assets) {
     ctx.fillStyle = 'rgba(0,255,102,.95)'; ctx.fillText('ground  gFrac=' + gFrac.toFixed(2) + '   [↑/↓]', 10, gy - 6);
     ctx.strokeStyle = 'rgba(0,210,255,.9)'; ctx.beginPath(); ctx.moveTo(0, vy); ctx.lineTo(W, vy); ctx.stroke();
     ctx.fillStyle = 'rgba(0,210,255,.95)'; ctx.fillText('vanish  tFrac=' + tFrac.toFixed(2) + '   [←/→]', 10, vy + 16);
+    ctx.restore();
+  }
+  // SAND/DUST — puffs kicked up at the runner's feet, drifting down + outward and
+  // fading; spawn rate scales with pace. Cheap (a few dozen circles). Draw behind
+  // the runner so it reads as dust at/behind the feet.
+  function drawDust(ctx, Wd, Hd, groundY, pace, now, dt) {
+    if (pace > 0.04 && dust.length < 90) {
+      dustAcc += pace * dt * 0.05;
+      while (dustAcc >= 1) {
+        dustAcc -= 1; const side = Math.random() < 0.5 ? -1 : 1;
+        dust.push({ x: Wd * 0.5 + side * Wd * 0.03 * Math.random(), y: groundY - Hd * 0.005,
+          vx: side * (0.2 + Math.random() * 0.6), vy: 0.15 + Math.random() * 0.45,
+          r: Hd * 0.008 * (1 + Math.random() * 1.5), life: 1 });
+      }
+    }
+    ctx.save();
+    for (let i = dust.length - 1; i >= 0; i--) {
+      const p = dust[i]; p.life -= dt * 0.0018;
+      if (p.life <= 0) { dust.splice(i, 1); continue; }
+      p.x += p.vx * dt * 0.06; p.y += p.vy * dt * 0.06; p.r += dt * 0.018;
+      ctx.fillStyle = `rgba(150,112,72,${0.20 * p.life})`;
+      ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, 7); ctx.fill();
+    }
     ctx.restore();
   }
   function setGround(g, t) { gFrac = Math.max(0.5, Math.min(1.15, g)); tFrac = Math.max(0.15, Math.min(0.9, t)); }
@@ -161,36 +157,5 @@ export function createScene(assets) {
     ctx.restore();
   }
 
-  // demo-mode placeholder when there's no camera cutout.
-  function drawSilhouette(ctx, W, H, groundY, pace, now) {
-    const x = W * 0.5, h = H * 0.46, bob = Math.abs(Math.sin(now / (180 - pace * 100))) * h * 0.05 * (0.4 + pace); const y = groundY - bob;
-    ctx.save(); ctx.translate(x, y); ctx.fillStyle = 'rgba(18,10,28,.92)'; ctx.strokeStyle = 'rgba(18,10,28,.92)'; ctx.lineCap = 'round';
-    ctx.beginPath(); ctx.arc(0, -h * 0.86, h * 0.12, 0, 7); ctx.fill();
-    ctx.beginPath(); ctx.moveTo(-h * 0.1, -h * 0.74); ctx.lineTo(h * 0.1, -h * 0.74); ctx.lineTo(h * 0.08, -h * 0.3); ctx.lineTo(-h * 0.08, -h * 0.3); ctx.closePath(); ctx.fill();
-    const sw = Math.sin(now / 120) * h * 0.18; ctx.lineWidth = h * 0.1;
-    ctx.beginPath(); ctx.moveTo(0, -h * 0.32); ctx.lineTo(sw, 0); ctx.stroke();
-    ctx.beginPath(); ctx.moveTo(0, -h * 0.32); ctx.lineTo(-sw, 0); ctx.stroke();
-    ctx.restore();
-  }
-
-  function beginEscape(now) { escEnd = now + 3600; }
-  // returns true once the cutscene is done. player/pm composite "you" getting in.
-  function drawEscape(ctx, W, H, groundY, now, player, pm) {
-    if (!escEnd) escEnd = now + 3600;
-    const p = clamp(1 - (escEnd - now) / 3600, 0, 1);
-    const parked = (p > 0.18 && p < 0.78), seated = assets.jeepSeated;
-    const jeep = parked ? (seated || assets.jeep) : assets.jeep;
-    const jh = H * 0.42, jar = jeep ? jeep.naturalWidth / jeep.naturalHeight : 2, jw = jh * jar;
-    let jx; if (p < 0.18) jx = lerp(-jw, W * 0.56, p / 0.18); else if (p < 0.78) jx = W * 0.56; else jx = lerp(W * 0.56, W * 1.3, (p - 0.78) / 0.22);
-    const jy = groundY + H * 0.03;
-    if (p < 0.6) {
-      const a = p < 0.45 ? 1 : 1 - (p - 0.45) / 0.15; const cx = lerp(W * 0.5, jx - jw * 0.05, clamp(p / 0.5, 0, 1));
-      if (player && player.has()) player.draw(ctx, W, H, groundY, pm, clamp(a, 0, 1), cx / W);
-      else { ctx.save(); ctx.globalAlpha = clamp(a, 0, 1); drawSilhouette(ctx, W, H, groundY, 1, now); ctx.restore(); }
-    }
-    if (jeep) ctx.drawImage(jeep, jx - jw / 2, jy - jh, jw, jh);
-    return p >= 1;
-  }
-
-  return { beginCamera, endCamera, drawSpeedLines, drawBgSeq, drawBackdrop, drawGround, drawDino, drawSilhouette, drawGuides, setGround, setBgAnchor, getGround, setDebug, beginEscape, drawEscape };
+  return { beginCamera, endCamera, drawSpeedLines, drawBgSeq, drawBackdrop, drawDino, drawDust, drawGuides, setGround, setBgAnchor, getGround, setDebug };
 }

@@ -135,10 +135,15 @@ export function createReplayBuffer(opts = {}) {
       recorder.start(timesliceMs);
       running = true;
 
-      // Composite loop: keep the offscreen canvas updated every frame.
-      const tick = () => {
+      // Composite loop: redraw the offscreen canvas at the CAPTURE fps, not every
+      // animation frame. captureStream only samples at `fps`, so drawing at ~60fps
+      // doubled the canvas/GPU work for nothing — throttling roughly halves the
+      // recorder's load (important when pose detection is also running).
+      const frameMs = 1000 / Math.max(1, fps);
+      let lastDraw = -1e9;
+      const tick = (now) => {
         if (!running) return;
-        drawFrame(demoBg);
+        if (now - lastDraw >= frameMs - 1) { drawFrame(demoBg); lastDraw = now; }
         rafId = requestAnimationFrame(tick);
       };
       rafId = requestAnimationFrame(tick);

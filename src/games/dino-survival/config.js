@@ -6,13 +6,11 @@
 // (Score is escape TIME + personal best — no tier badges.)
 // ===========================================================================
 
+// Single difficulty — Impossible. (Easy/Medium/Hard removed.)
 export const LEVELS = {
-  EASY:       { key: 'EASY',       label: 'Easy',       goal: 38, d0: 0.38, r: 0.0030, kGain: 0.06, g0: 0.62 },
-  MEDIUM:     { key: 'MEDIUM',     label: 'Medium',     goal: 42, d0: 0.45, r: 0.0040, kGain: 0.06, g0: 0.50 },
-  HARD:       { key: 'HARD',       label: 'Hard',       goal: 46, d0: 0.55, r: 0.0052, kGain: 0.06, g0: 0.40 },
   IMPOSSIBLE: { key: 'IMPOSSIBLE', label: 'Impossible', goal: 50, d0: 0.66, r: 0.0065, kGain: 0.06, g0: 0.30 },
 };
-export const DEFAULT_LEVEL = 'MEDIUM';
+export const DEFAULT_LEVEL = 'IMPOSSIBLE';
 
 // Global dino-speed multiplier — the single knob to tune the whole chase up/down
 // across all levels (1 = as tuned; >1 = faster/harder dino, <1 = slower/easier).
@@ -27,12 +25,11 @@ export const TRAIL_TOP_FRAC = 0.48;
 export const SCROLL_SPEED = 0.007;     // how fast the ground flows per unit pace
 export const PLAYER_TORSO_FRAC = 0.14; // target on-screen torso height (player size normalisation)
 
-// Asset URLs (served from /public). The keyed, dust-free, checker-free cut-outs.
+// Asset URLs (served from /public). trail.png is the intro/ambient image + a
+// fallback if the bg loop frames haven't loaded. (Jeep + dino-lunge stills are
+// gone — escape/catch are video cutscenes now.)
 export const ASSET_SRC = {
-  bgTrail:   '/assets/dino-survival/bg/trail.png',
-  dinoLunge: '/assets/dino-survival/cut/dino_front_lunge.png',
-  jeep:      '/assets/dino-survival/cut/jeep.png',
-  jeepSeated:'/assets/dino-survival/cut/jeep_driver_seated.png',
+  bgTrail: '/assets/dino-survival/bg/trail.png',
 };
 
 // Real gallop frames extracted from a Grok image-to-video clip (green-keyed,
@@ -46,9 +43,23 @@ export const DINO_RUN_FRAMES = Array.from({ length: 16 }, (_, i) =>
 export const BG_LOOP_FRAMES = Array.from({ length: 40 }, (_, i) =>
   `/assets/dino-survival/bg/trail_loop_seq/bg_${String(i + 1).padStart(3, '0')}.jpg`);
 
-// MediaPipe (loaded from CDN at runtime, same as the app's poseTracker).
+// Player avatar: one dense run-cycle stride cut from a runner clip (rembg), plus
+// its per-frame MediaPipe rig (rig.json). Played by cadence; replaces the live
+// segmentation cutout (much lighter on mobile — no per-frame ML segmentation).
+export const RUNNER_FRAMES = Array.from({ length: 40 }, (_, i) =>
+  `/assets/dino-survival/cut/runner/run_${String(i).padStart(2, '0')}.png`);
+export const RUNNER_RIG_URL = '/assets/dino-survival/cut/runner/rig.json';
+export const RUNNER_IDLE_FRAME = 29;   // most 'standing' frame (feet together) — shown when idle / off-pose
+export const RUNNER_OFF_DIST = 5.0;    // pose-match distance above which we treat you as 'off-pose' (not running) -> stand
+// Clean single-stride loop inside the library (frames 5..11 match endpoints) — used
+// for the timer-driven run cycle so it loops SEAMLESSLY (the full 40 frames span
+// several strides and would jump at the wrap). Pose-matching still uses all frames.
+export const RUNNER_RUN_START = 5;
+export const RUNNER_RUN_LEN = 7;
+
+// MediaPipe Pose (loaded from CDN at runtime). Segmentation removed — the avatar
+// is a baked sprite now, so we only run pose for control/cadence.
 export const MP = {
   TV:   'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.35',
   POSE: 'https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task',
-  SEG:  'https://storage.googleapis.com/mediapipe-models/image_segmenter/selfie_segmenter/float16/latest/selfie_segmenter.tflite',
 };
