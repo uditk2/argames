@@ -157,6 +157,10 @@ export default function DinoSurvival({ onExit }) {
     surv.reset();
     setScreen('playing');
     sfx.resume(); sfx.stopAll();   // (jungle ambience bed removed per feedback)
+    // lazy-load: start buffering the catch/escape clips now (a run lasts several
+    // seconds, so they're ready by the time one fires) instead of on page load.
+    try { caughtVideoRef.current && caughtVideoRef.current.load(); } catch {}
+    try { escapeVideoRef.current && escapeVideoRef.current.load(); } catch {}
     let hudAcc = 0;
 
     const loop = () => {
@@ -365,12 +369,12 @@ export default function DinoSurvival({ onExit }) {
       <video ref={videoRef} playsInline muted className="absolute -left-[9999px] -top-[9999px]" />
       {/* caught cutscene: dino capture sting — fades in over the cut, and stays frozen
           on its last frame as the result backdrop when you were caught. */}
-      <video ref={caughtVideoRef} src="/assets/dino-survival/cut/caught.mp4" playsInline muted preload="auto"
+      <video ref={caughtVideoRef} src="/assets/dino-survival/cut/caught.mp4" playsInline muted preload="none"
         className="absolute inset-0 w-full h-full object-cover bg-black z-[15]"
         style={{ opacity: (screen === 'caught' || (screen === 'result' && result && !result.escaped)) ? 1 : 0, transition: 'opacity .3s ease', pointerEvents: 'none' }} />
       {/* escape cutscene: jeep getaway — fades in, then freezes on its last frame as
           the result backdrop when you escaped. */}
-      <video ref={escapeVideoRef} src="/assets/dino-survival/cut/escaped.mp4" playsInline muted preload="auto"
+      <video ref={escapeVideoRef} src="/assets/dino-survival/cut/escaped.mp4" playsInline muted preload="none"
         className="absolute inset-0 w-full h-full object-cover bg-black z-[15]"
         style={{ opacity: (screen === 'escaped' || (screen === 'result' && result && result.escaped)) ? 1 : 0, transform: (screen === 'escaped' || (screen === 'result' && result && result.escaped)) ? 'scale(1)' : 'scale(0.9)', transformOrigin: 'center center', transition: 'opacity .3s ease, transform .45s ease', pointerEvents: 'none' }} />
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full" />

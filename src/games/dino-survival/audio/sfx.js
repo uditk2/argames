@@ -98,11 +98,11 @@ export function createAudio() {
   function startAmb(vol) {
     const g = ctx.createGain(); g.gain.value = vol; g.connect(master);
     const wind = noiseSrc(); const wlp = ctx.createBiquadFilter(); wlp.type = 'lowpass'; wlp.frequency.value = 480; const wg = ctx.createGain(); wg.gain.value = 0.12; wind.connect(wlp); wlp.connect(wg); wg.connect(g); wind.start();
-    const ins = noiseSrc(); const ibp = ctx.createBiquadFilter(); ibp.type = 'bandpass'; ibp.frequency.value = 6500; ibp.Q.value = 0.4; const ig = ctx.createGain(); ig.gain.value = 0.03; ins.connect(ibp); ibp.connect(ig); ig.connect(g); ins.start();
+    // (removed the high-freq band-pass "insect" noise layer — it read as a hiss.)
     let timer;
     const chirp = () => { const t = now(); const o = ctx.createOscillator(); o.type = 'sine'; const f = 1600 + Math.random() * 1800; o.frequency.setValueAtTime(f, t); o.frequency.linearRampToValueAtTime(f * (1 + (Math.random() * 0.4 - 0.1)), t + 0.12); const cg = envGain(t, 0.02, 0.16, 0.06); o.connect(cg); cg.connect(g); o.start(t); o.stop(t + 0.2); timer = setTimeout(chirp, 1200 + Math.random() * 3200); };
     timer = setTimeout(chirp, 700);
-    loops.amb = { gain: g, stop() { try { wind.stop(); ins.stop(); } catch {} clearTimeout(timer); try { g.disconnect(); } catch {} } };
+    loops.amb = { gain: g, stop() { try { wind.stop(); } catch {} clearTimeout(timer); try { g.disconnect(); } catch {} } };
   }
   function startMusic(vol) {
     const g = ctx.createGain(); g.gain.value = vol; g.connect(master);
