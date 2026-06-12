@@ -11,6 +11,8 @@ import { createRunner } from '../render/runner.js';
 import { createSurvival } from '../engine/survival.js';
 import { createScene } from '../render/scene.js';
 import { loadAssets } from '../render/assets.js';
+import { createAudio } from '../audio/sfx.js';
+import { clamp } from '../util.js';
 import { createReplayBuffer } from '../../../recording/replayBuffer.js';
 // Best-score persistence lives behind one module: instant localStorage cache +
 // best-effort sync through /api/score (Neon). See src/net/scores.js.
@@ -21,6 +23,8 @@ import Leaderboard from '../../../ui/Leaderboard.jsx';
 export default function DinoSurvival({ onExit }) {
   const canvasRef = useRef(null), videoRef = useRef(null), caughtVideoRef = useRef(null), escapeVideoRef = useRef(null), G = useRef({});
   const assetsRef = useRef(null);   // cache loaded images across runs (avoid re-decoding ~50MB every game)
+  const sfxRef = useRef(null);      // procedural Web Audio engine (reused across runs)
+  const [audioMuted, setAudioMuted] = useState(() => { try { return localStorage.getItem('slayfit_dino_muted') === '1'; } catch { return false; } });
   const [screen, setScreen] = useState('intro');         // intro | loading | playing | result
   const [level] = useState(DEFAULT_LEVEL);   // single difficulty (Impossible)
   const [hud, setHud] = useState({ t: 0, pace: 0, spm: 0, distPct: 0 });
@@ -45,6 +49,8 @@ export default function DinoSurvival({ onExit }) {
     if (g.raf) cancelAnimationFrame(g.raf);
     if (g.demoTimer) clearInterval(g.demoTimer);
     if (g.csTimer) clearTimeout(g.csTimer);
+    try { sfxRef.current && sfxRef.current.stopAll(); } catch {}
+    if (g.audioTimers) g.audioTimers.forEach(clearTimeout);
     if (g.clipUrl) { try { URL.revokeObjectURL(g.clipUrl); } catch {} }   // free the previous run's replay blob
     try { caughtVideoRef.current && caughtVideoRef.current.pause(); } catch {}
     try { escapeVideoRef.current && escapeVideoRef.current.pause(); } catch {}
@@ -88,6 +94,20 @@ export default function DinoSurvival({ onExit }) {
     const g = G.current = { mode, ctx, cv, det, surv, scene, runner, fit, assets, tlog: [] };
     window.addEventListener('resize', fit);
 
+    // audio: reuse one procedural engine across runs; reset per-run cue state
+    const sfx = sfxRef.current || (sfxRef.current = createAudio()); sfx.setMuted(audioMuted); g.sfx = sfx;
+    g.audioTimers = []; g.au = { lastCount: 99, nextFootfall: 0, nextSnarl: 0, roared: false };
+    const startChase = () => { sfx.startLoop('music', 0.42); sfx.startLoop('run', 0); };
+    // per-frame cues while running: footsteps track pace; music + dino threat scale with near (=1-gap)
+    const chaseAudio = (now, near) => {
+      sfx.setLoop('run', pace > 0.05 ? clamp(0.18 + pace * 0.5, 0, 0.7) : 0, 0.75 + pace * 0.85);
+      sfx.setLoop('music', 0.40 + near * 0.18);
+      if (near > 0.22 && now >= g.au.nextFootfall) { sfx.play('footfall', 0.12 + near * 0.73, 0.9 + near * 0.25); g.au.nextFootfall = now + (820 - near * 520); }
+      if (near > 0.5 && now >= g.au.nextSnarl) { sfx.play('snarl', 0.3 + near * 0.4); g.au.nextSnarl = now + (2400 - near * 1200); }
+      if (near > 0.74 && !g.au.roared) { g.au.roared = true; sfx.play('roar', 0.9, 1.0); }
+      else if (near < 0.6 && g.au.roared) { g.au.roared = false; }
+    };
+
     // pose / demo input
     if (mode === 'camera') {
       try {
@@ -116,6 +136,7 @@ export default function DinoSurvival({ onExit }) {
     // ground line / vanishing point live; [ ] shift the background vertical anchor.
     const dbgKey = (e) => {
       const k = e.key.toLowerCase();
+      if (k === 'm') { toggleMute(); return; }           // mute/unmute
       if (k === 't') { downloadTelemetry(); return; }   // grab the trace anytime (even if detection died)
       if (k === 'g') { g.debug = !g.debug; scene.setDebug(g.debug); if (!g.debug) setDbg(null); return; }
       if (!g.debug) return;
@@ -135,6 +156,7 @@ export default function DinoSurvival({ onExit }) {
 
     surv.reset();
     setScreen('playing');
+    sfx.resume(); sfx.stopAll();   // (jungle ambience bed removed per feedback)
     let hudAcc = 0;
 
     const loop = () => {
@@ -145,13 +167,18 @@ export default function DinoSurvival({ onExit }) {
       const legsOK = mode !== 'camera' || framed(lm);
       const warn = mode === 'camera' && phase === 'running' && !legsOK; setLegsWarn(warn);
 
-      if (phase === 'countdown' && countTo - now <= 0) { phase = 'running'; }
+      if (phase === 'countdown') {
+        const n = Math.ceil((countTo - now) / 1000);
+        if (n !== g.au.lastCount) { g.au.lastCount = n; if (n > 0) sfx.play('beep', 0.5, 1); }   // 3-2-1
+        if (countTo - now <= 0) { phase = 'running'; sfx.play('beep', 0.7, 0.7); startChase(); }  // GO + loops up
+      }
       if (phase === 'running' && legsOK) {
         const s = surv.step(pace, dt);
         if (s.phase === 'escaped') { phase = 'escaped'; playEscape(); }
         else if (s.phase === 'caught') { phase = 'caught'; playCaught(); }
       }
       const snap = surv.snapshot();
+      if (phase === 'running') chaseAudio(now, snap.near);   // footsteps / music swell / dino threat
       let keepRunWarn = false;
       // accumulate run analytics while actually running
       if (phase === 'running') {
@@ -229,10 +256,20 @@ export default function DinoSurvival({ onExit }) {
       try { v.currentTime = 0; const p = v.play(); if (p && p.catch) p.catch(() => done()); } catch { done(); }
       G.current.csTimer = setTimeout(done, safetyMs);
     }
-    function playEscape() { playCutscene(escapeVideoRef.current, 'escaped', 5400); }   // clip ~4.83s
+    function playEscape() {
+      sfx.stopLoop('run'); sfx.stopLoop('music'); sfx.play('engine', 0.75, 1.0);     // jeep turns over
+      g.audioTimers.push(setTimeout(() => sfx.play('door', 0.85), 1100));            // door shuts
+      g.audioTimers.push(setTimeout(() => sfx.play('engine', 0.95, 1.12), 2300));    // peel-off
+      playCutscene(escapeVideoRef.current, 'escaped', 5400);   // clip ~4.83s
+    }
 
     // Caught -> play the dino lunge/capture sting fullscreen, THEN show the result.
-    function playCaught() { playCutscene(caughtVideoRef.current, 'caught', 5600); }   // catch clip ~5.1s (chase -> lunge -> grab)
+    function playCaught() {
+      sfx.stopLoop('run'); sfx.stopLoop('music');
+      sfx.play('roar', 1.0, 0.95); sfx.play('footfall', 0.9, 0.8);                   // lunge
+      g.audioTimers.push(setTimeout(() => sfx.play('chomp', 1.0), 500));             // the bite — "consuming"
+      playCutscene(caughtVideoRef.current, 'caught', 3600);   // catch clip ~3.1s (from f9: lunge -> grab -> bite)
+    }
 
     function finish() {
       if (G.current.finished) return; G.current.finished = true;
@@ -310,6 +347,14 @@ export default function DinoSurvival({ onExit }) {
     dlOrShare(clip.blob, `slayfit-dino-survival.${ext}`, 'My Dino Survival run');
   }
 
+  // master mute — drives the audio engine (if running) and persists either way
+  const toggleMute = useCallback(() => {
+    const sfx = sfxRef.current; let m;
+    if (sfx) m = sfx.toggle();
+    else { m = !audioMuted; try { localStorage.setItem('slayfit_dino_muted', m ? '1' : '0'); } catch {} }
+    setAudioMuted(m);
+  }, [audioMuted]);
+
   const lvl = LEVELS[level];
 
   return (
@@ -322,7 +367,7 @@ export default function DinoSurvival({ onExit }) {
           on its last frame as the result backdrop when you were caught. */}
       <video ref={caughtVideoRef} src="/assets/dino-survival/cut/caught.mp4" playsInline muted preload="auto"
         className="absolute inset-0 w-full h-full object-cover bg-black z-[15]"
-        style={{ opacity: (screen === 'caught' || (screen === 'result' && result && !result.escaped)) ? 1 : 0, transform: (screen === 'caught' || (screen === 'result' && result && !result.escaped)) ? 'scale(1)' : 'scale(0.93)', transformOrigin: 'center 45%', transition: 'opacity .3s ease, transform .4s ease', pointerEvents: 'none' }} />
+        style={{ opacity: (screen === 'caught' || (screen === 'result' && result && !result.escaped)) ? 1 : 0, transition: 'opacity .3s ease', pointerEvents: 'none' }} />
       {/* escape cutscene: jeep getaway — fades in, then freezes on its last frame as
           the result backdrop when you escaped. */}
       <video ref={escapeVideoRef} src="/assets/dino-survival/cut/escaped.mp4" playsInline muted preload="auto"
@@ -347,6 +392,11 @@ export default function DinoSurvival({ onExit }) {
         <div className="font-display font-black text-lg bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">SLAYFIT</div>
         <div className="text-[9px] tracking-[0.24em] text-magic/80 uppercase">Dino Survival</div>
       </div>
+
+      {/* Mute toggle (also 'M') — always available */}
+      <button onClick={toggleMute} title={audioMuted ? 'Unmute (M)' : 'Mute (M)'} aria-label={audioMuted ? 'Unmute' : 'Mute'}
+        className="absolute top-3.5 right-3.5 z-[25] pointer-events-auto cursor-pointer panel w-9 h-9 flex items-center justify-center text-base leading-none"
+        style={{ marginTop: screen === 'playing' ? '52px' : '0' }}>{audioMuted ? '🔇' : '🔊'}</button>
 
       {screen === 'playing' && (
         <>
