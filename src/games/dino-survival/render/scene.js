@@ -18,6 +18,12 @@ export function createScene(assets) {
   let bgAnchor = 0.72;  // vertical anchor for the portrait bg cover-fit (toward 1 = show foreground trail)
   let debug = false;
   let dust = [], dustAcc = 0;   // sand/dust particles kicked up behind the runner
+  // Foot-strike sync: the gallop frames where a foot plants (measured from the
+  // sprite alpha — lowest foot extension). drawDino raises a strike when the
+  // displayed frame enters one of these; the UI plays the footfall on it so the
+  // stomp lands with the dino's feet. Value = relative impact strength.
+  const CONTACT = { 1: 0.85, 6: 1.0, 12: 0.8 };
+  let lastFrameIdx = -1, strikeStrength = 0;
 
   // Distance-indexed BACKGROUND LOOP — the seamless forward-dolly trail frames.
   // `pos` (a float) is driven by accumulated distance: holding still freezes the
@@ -55,7 +61,9 @@ export function createScene(assets) {
     // cycle the real gallop frames at a CONSTANT cadence — only size/position change
     // with distance (speeding the gait up as it neared looked weird).
     const mspf = 60;
-    const runIm = frames.length ? frames[Math.floor(now / mspf) % frames.length] : null;
+    const idx = frames.length ? Math.floor(now / mspf) % frames.length : -1;
+    const runIm = idx >= 0 ? frames[idx] : null;
+    if (idx !== lastFrameIdx) { lastFrameIdx = idx; if (CONTACT[idx]) strikeStrength = CONTACT[idx]; }   // foot plant -> arm a stomp
     // The dino just GALLOPS (growing) all the way to the catch — the lunge now lives
     // entirely in the catch cutscene.
     const im = runIm;
@@ -110,6 +118,9 @@ export function createScene(assets) {
   function setBgAnchor(a) { bgAnchor = Math.max(0, Math.min(1, a)); }
   function getGround() { return { gFrac, tFrac, bgAnchor }; }
   function setDebug(d) { debug = !!d; }
+  // Returns the pending foot-strike strength (0 = none) and clears it. Called once
+  // per frame by the UI right after drawDino so the footfall lands on the plant.
+  function consumeStrike() { const s = strikeStrength; strikeStrength = 0; return s; }
 
   // GLOBAL CAMERA — mounted on the jeep driving AHEAD, looking back at you (so you
   // and the dino both face it). It moves like a *vehicle*, not a runner: a slow
@@ -157,5 +168,5 @@ export function createScene(assets) {
     ctx.restore();
   }
 
-  return { beginCamera, endCamera, drawSpeedLines, drawBgSeq, drawBackdrop, drawDino, drawDust, drawGuides, setGround, setBgAnchor, getGround, setDebug };
+  return { beginCamera, endCamera, drawSpeedLines, drawBgSeq, drawBackdrop, drawDino, consumeStrike, drawDust, drawGuides, setGround, setBgAnchor, getGround, setDebug };
 }

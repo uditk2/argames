@@ -102,7 +102,7 @@ export default function DinoSurvival({ onExit }) {
     const chaseAudio = (now, near) => {
       sfx.setLoop('run', pace > 0.05 ? clamp(0.18 + pace * 0.5, 0, 0.7) : 0, 0.75 + pace * 0.85);
       sfx.setLoop('music', 0.40 + near * 0.18);
-      if (near > 0.22 && now >= g.au.nextFootfall) { sfx.play('footfall', 0.12 + near * 0.73, 0.9 + near * 0.25); g.au.nextFootfall = now + (820 - near * 520); }
+      // (dino footfalls are triggered on the animation's foot-strike, not here)
       if (near > 0.5 && now >= g.au.nextSnarl) { sfx.play('snarl', 0.3 + near * 0.4); g.au.nextSnarl = now + (2400 - near * 1200); }
       if (near > 0.74 && !g.au.roared) { g.au.roared = true; sfx.play('roar', 0.9, 1.0); }
       else if (near < 0.6 && g.au.roared) { g.au.roared = false; }
@@ -116,10 +116,13 @@ export default function DinoSurvival({ onExit }) {
         pose.start((lm, vid, mask) => {
           latestLM = lm; latestVid = vid;   // segmentation removed — avatar is a baked sprite now
           if (phase === 'calibrating') {
-            if (framed(lm)) { if (!calStart) calStart = performance.now(); det.calibrate(lm);
-              setCalib({ msg: 'Stand tall & still', sub: 'Capturing your standing pose…', ok: true });
-              if (performance.now() - calStart > 1200) { phase = 'countdown'; countTo = performance.now() + 3000; setCalib(null); }
-            } else { calStart = 0; setCalib({ msg: 'Step back', sub: 'Get your hips, knees AND feet in frame', ok: false }); }
+            if (framed(lm)) {
+              if (!g.calDone) { det.calibrate(lm); g.calDone = true; }   // capture the standing baseline once
+              // legs track far better once they're MOVING, so we start on a few
+              // detected steps rather than a still full-body pose.
+              if (det.stats().steps >= 3) { phase = 'countdown'; countTo = performance.now() + 3000; setCalib(null); }
+              else setCalib({ msg: 'Run in place to start', sub: 'lift your knees so we can read your stride', ok: true });
+            } else { g.calDone = false; setCalib({ msg: 'Step back & run in place', sub: 'get your knees AND feet in frame, then jog', ok: false }); }
           }
         });
       } catch (e) {
@@ -205,6 +208,10 @@ export default function DinoSurvival({ onExit }) {
       } else {
         const near = scene.drawDino(ctx, W, H, groundY, snap.gap, now);
         camNear += (near - camNear) * 0.12;                 // smoothed closeness for the camera
+        // stomp lands on the dino's actual foot-plant (scene reports the strike),
+        // louder/heavier as it closes in; only audible during the live chase.
+        const strike = scene.consumeStrike();
+        if (phase === 'running' && strike > 0 && near > 0.12) sfx.play('footfall', (0.1 + near * 0.7) * strike, 0.9 + near * 0.2);
         // Player avatar. While RUNNING, the cycle advances with your pace — the SAME
         // measure that drives the ground — so the runner always moves in lockstep
         // with the world. While idle, we pose-match your live skeleton (arms/standing
