@@ -90,3 +90,40 @@ is the visual reference for the look.
   clip but `exportClip()` is a TODO; the Results "Share" button is a placeholder.
 - The webcam + pose path can't be tested in a headless/no-camera environment — use
   Demo mode there.
+
+## Leaderboard / score persistence (Neon)
+
+Scores sync through a Vercel serverless function to a Neon (Postgres) DB. The
+browser never sees the DB credential.
+
+**Setup**
+1. `cp .env.example .env.local` and set `DATABASE_URL` to your Neon connection string.
+2. Apply the schema once: paste `db/schema.sql` into Neon's SQL editor (or
+   `psql "$DATABASE_URL" -f db/schema.sql`).
+3. In Vercel → Project → Settings → Environment Variables, add the same
+   `DATABASE_URL` for Production/Preview.
+
+**Shape** — single `scores` table, append-only, one row per run; `game` column
+namespaces modes. Best/leaderboard are queries over it (partial indexes keep
+top-N fast at 1M+ rows). Two leaderboard **metrics**, chosen per game in the
+`GAMES` registry (`api/score.js`):
+- `dino-survival` → **time** metric (fastest escape `time_s` wins)
+- `monster-punch` → **score** metric (highest `score` wins)
+
+**Server is the scorekeeper.** One round-trip per game: `POST /api/score` ends
+the run and returns `{ best, isPB, country, leaderboard }` together — the server
+decides the personal-best flag and reads the country from the request's own edge
+geo headers, so there's no separate geo call and the results screen makes no
+extra requests.
+
+**Files**
+- `api/_db.js` — shared Neon client + `requireWrite()` guard + per-client rate limit
+- `api/score.js` — metric-aware `POST` (best+isPB+country+leaderboard) · `GET` best + top-100 + country
+- `src/net/scores.js` — `createScoreClient(game, {metric})` factory (cache + best-effort sync)
+- `src/net/gameClients.js` — preconfigured `dinoScores` / `punchScores` clients
+- `src/net/identity.js` — player name + country, cookie-backed (shared across games)
+- `src/ui/Leaderboard.jsx` — shared themed leaderboard (renders either metric)
+
+**Note:** `POST /api/score` is currently open (anyone can submit). It enforces a
+basic plausibility floor (`MIN_ESCAPE_S`); add a shared-secret / rate-limit guard
+in `requireWrite()` before trusting the leaderboard publicly.

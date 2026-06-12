@@ -14,6 +14,8 @@ import {
   openSocialShare,
   copyShareLink,
 } from '../../sharing/index.js';
+import Leaderboard from '../Leaderboard.jsx';
+import { punchScores, PUNCH_LEVEL } from '../../net/gameClients.js';
 
 // Per-network share targets. The card image they preview is the dynamic
 // /api/og card, served via our public /s page (see src/sharing/socialShare.js).
@@ -29,7 +31,8 @@ function fmtDur(sec) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
-export default function ResultsScreen({ results, clip, onPlayAgain }) {
+export default function ResultsScreen({ results, clip, board = null, onPlayAgain }) {
+  const [showBoard, setShowBoard] = useState(false);
   const stats = [
     { label: 'Score', value: results.score.toLocaleString(), cls: 'text-white' },
     { label: 'Demons slain', value: results.slain, cls: 'text-gold' },
@@ -139,15 +142,23 @@ export default function ResultsScreen({ results, clip, onPlayAgain }) {
       />
       <div className="absolute inset-0 bg-gradient-to-b from-[rgb(var(--magic-rgb)/.28)] via-[rgba(16,10,6,.78)] to-[rgba(8,5,3,.96)]" />
 
-      <div className="relative z-10 panel p-8 w-[min(94vw,560px)] max-h-[94vh] overflow-y-auto text-center">
+      {showBoard && (
+        <div className="relative z-20 panel p-7 w-[min(94vw,520px)] max-h-[94vh] overflow-y-auto">
+          <Leaderboard client={punchScores} level={PUNCH_LEVEL} label="Arena" onClose={() => setShowBoard(false)} />
+        </div>
+      )}
+
+      <div className={`relative z-10 panel p-8 w-[min(94vw,560px)] max-h-[94vh] overflow-y-auto text-center ${showBoard ? 'hidden' : ''}`}>
         <div className="font-display font-black text-2xl bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">
-          REALM CLEARED
+          ROUND COMPLETE
         </div>
         <div className="text-[11px] tracking-[0.22em] uppercase text-magic/80 mt-1">
           {fmtDur(results.durationSec)} workout complete
         </div>
 
-        <div className="grid grid-cols-2 gap-3 mt-6">
+        {results.isNew && <p className="text-gold font-extrabold mt-3">New personal best!</p>}
+
+        <div className="grid grid-cols-2 gap-3 mt-4">
           {stats.map((s) => (
             <div key={s.label} className="panel py-3">
               <div className="text-[11px] uppercase tracking-wider text-magic/70">{s.label}</div>
@@ -155,6 +166,19 @@ export default function ResultsScreen({ results, clip, onPlayAgain }) {
             </div>
           ))}
         </div>
+
+        {/* Top players — preloaded from the submit response, so no extra call. */}
+        {board && board.length > 0 && (
+          <div className="mt-6">
+            <Leaderboard client={punchScores} level={PUNCH_LEVEL} label="Arena" rows={board.slice(0, 5)} compact />
+            <button
+              onClick={() => setShowBoard(true)}
+              className="mt-2 text-[12px] px-4 py-1.5 rounded-lg font-semibold text-gold/90 bg-realm/50 border border-gold/30 hover:border-gold/60 transition"
+            >
+              View full leaderboard
+            </button>
+          </div>
+        )}
 
         {/* Share previews */}
         <div className="mt-6 grid grid-cols-2 gap-3">

@@ -4,11 +4,14 @@
 // magical mockup.
 // ===========================================================================
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { DURATION_PRESETS } from '../../config/game.config.js';
 import { AVATARS, getAvatar } from '../../config/avatars.js';
 import { BRAND } from '../../config/brand.js';
 import { trackGameStarted } from '../../analytics/ga.js';
+import { getName, setName, getCountry, setCountry, flagEmoji } from '../../net/identity.js';
+import { punchScores, PUNCH_LEVEL } from '../../net/gameClients.js';
+import Leaderboard from '../Leaderboard.jsx';
 
 function fmt(sec) {
   const m = Math.floor(sec / 60);
@@ -20,9 +23,25 @@ export default function StartScreen({ initial, onStart }) {
   const [durationSec, setDurationSec] = useState(initial.durationSec);
   const [bodyweightKg, setBodyweightKg] = useState(initial.bodyweightKg);
   const [avatarId, setAvatarId] = useState(initial.avatarId);
+  const [name, setNameState] = useState(() => getName());
+  const [country, setCountryState] = useState(() => getCountry());
+  const [showBoard, setShowBoard] = useState(false);
+  const [note, setNote] = useState('');
   const avatar = getAvatar(avatarId);
 
+  // One server call: detect country (and warm the board) at the arena gate.
+  useEffect(() => {
+    if (country) return;
+    let live = true;
+    punchScores.fetchState(PUNCH_LEVEL).then((st) => {
+      if (live && st?.country) { setCountry(st.country); setCountryState(st.country); }
+    });
+    return () => { live = false; };
+  }, [country]);
+
   const begin = (mode) => {
+    if (!name.trim()) { setNote('Name your fighter first.'); return; }
+    setName(name);
     trackGameStarted({ durationSec, mode, avatarId });
     onStart({ durationSec, bodyweightKg: Number(bodyweightKg) || 70, avatarId, mode });
   };
@@ -38,11 +57,20 @@ export default function StartScreen({ initial, onStart }) {
       <div className="absolute inset-0 bg-gradient-to-b from-[rgba(90,30,110,.45)] via-[rgba(16,8,30,.7)] to-[rgba(8,4,16,.92)]" />
       <div className="absolute left-1/2 top-[58%] w-[520px] h-[520px] -ml-[260px] -mt-[260px] rounded-full border-2 border-dashed border-magic/30 animate-spin-slow shadow-[0_0_60px_rgb(var(--magic-rgb)/.2)_inset]" />
 
+      {/* Leaderboard overlay */}
+      {showBoard && (
+        <div className="relative z-10 panel p-7 w-[min(92vw,480px)]">
+          <Leaderboard client={punchScores} level={PUNCH_LEVEL} label="Arena" onClose={() => setShowBoard(false)} />
+        </div>
+      )}
+
       {/* Card */}
+      {!showBoard && (
       <div className="relative z-10 panel p-8 w-[min(92vw,460px)]">
         <div className="text-center mb-6">
+          <div className="text-[10px] tracking-[0.3em] text-magic/60 uppercase mb-1">{BRAND.wordmark}</div>
           <div className="font-display font-black text-3xl bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">
-            {BRAND.wordmark}
+            MONSTER PUNCH
           </div>
           <div className="text-[11px] tracking-[0.24em] text-magic/80 mt-1 uppercase">
             {BRAND.tagline}
@@ -109,20 +137,49 @@ export default function StartScreen({ initial, onStart }) {
           />
         </div>
 
+        {/* Fighter name + detected origin — tagged onto your leaderboard score. */}
+        <div className="mb-5">
+          <div className="text-[11px] tracking-[0.14em] uppercase text-magic/80 mb-2">Fighter</div>
+          <div className="relative">
+            <input
+              value={name}
+              onChange={(e) => setNameState(e.target.value.slice(0, 40))}
+              onBlur={(e) => setName(e.target.value)}
+              placeholder="Name the champion…"
+              maxLength={40}
+              className="w-full py-2.5 pl-4 pr-10 rounded-xl bg-realm/50 border border-magic/40 text-ink placeholder:text-ink/40 focus:border-magic focus:outline-none focus:shadow-glow transition"
+            />
+            <span className="absolute right-3 top-1/2 -translate-y-1/2 text-lg leading-none" title={country || 'detecting origin'}>
+              {country ? flagEmoji(country) : '🌐'}
+            </span>
+          </div>
+          {note && <p className="text-fire-bright text-[11px] mt-1.5">{note}</p>}
+        </div>
+
         {/* Actions */}
         <div className="space-y-2">
           <button
             onClick={() => begin('camera')}
-            className="w-full py-3 rounded-xl font-bold text-white bg-gradient-to-r from-fire to-magic shadow-glow-fire hover:brightness-110 transition"
+            disabled={!name.trim()}
+            className="w-full py-3 rounded-xl font-bold text-white bg-gradient-to-r from-fire to-magic shadow-glow-fire hover:brightness-110 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:brightness-100"
           >
-            Start — enter the realm (camera)
+            Start — enter the arena (camera)
           </button>
-          <button
-            onClick={() => begin('demo')}
-            className="w-full py-2.5 rounded-xl font-semibold text-ink/90 bg-realm/50 border border-shield/40 hover:border-shield transition"
-          >
-            Demo mode (no camera)
-          </button>
+          <div className="flex gap-2">
+            <button
+              onClick={() => begin('demo')}
+              disabled={!name.trim()}
+              className="flex-1 py-2.5 rounded-xl font-semibold text-ink/90 bg-realm/50 border border-shield/40 hover:border-shield transition disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Demo mode
+            </button>
+            <button
+              onClick={() => setShowBoard(true)}
+              className="px-4 py-2.5 rounded-xl font-semibold text-gold/90 bg-realm/50 border border-gold/30 hover:border-gold/60 transition"
+            >
+              🏆 Ranks
+            </button>
+          </div>
         </div>
 
         <p className="mt-4 text-[11px] text-center text-magic/60 leading-relaxed">
@@ -130,6 +187,7 @@ export default function StartScreen({ initial, onStart }) {
           Camera needs HTTPS or localhost.
         </p>
       </div>
+      )}
     </div>
   );
 }
