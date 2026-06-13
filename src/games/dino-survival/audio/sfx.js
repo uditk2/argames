@@ -24,6 +24,14 @@ export function createAudio() {
   const master = ctx.createGain(); master.gain.value = muted ? 0 : 1; master.connect(ctx.destination);
   const now = () => ctx.currentTime;
 
+  // Real chase track (user-supplied, no-copyright Pixabay): a seamless ~40s loop
+  // cut from the song's intense section. Loaded once via fetch+decode; if it
+  // can't load we fall back to the synthesized loop (startMusicProc).
+  const MUSIC_URL = '/assets/dino-survival/audio/chase_music.mp3';
+  let musicBuf = null, musicFailed = false;
+  fetch(MUSIC_URL).then(r => { if (!r.ok) throw new Error(r.status); return r.arrayBuffer(); })
+    .then(ab => ctx.decodeAudioData(ab)).then(b => { musicBuf = b; }).catch(() => { musicFailed = true; });
+
   // --- shared building blocks -------------------------------------------------
   let _noise;                                   // 2s of white noise, reused everywhere
   function noiseBuf() { if (!_noise) { const n = ctx.sampleRate * 2; _noise = ctx.createBuffer(1, n, ctx.sampleRate); const d = _noise.getChannelData(0); for (let i = 0; i < n; i++) d[i] = Math.random() * 2 - 1; } return _noise; }
@@ -104,7 +112,20 @@ export function createAudio() {
     timer = setTimeout(chirp, 700);
     loops.amb = { gain: g, stop() { try { wind.stop(); } catch {} clearTimeout(timer); try { g.disconnect(); } catch {} } };
   }
+  // Real-track loop (preferred). Falls back to the synth scheduler if the file
+  // hasn't loaded yet (retry) or failed (startMusicProc).
   function startMusic(vol) {
+    if (loops.music) return;
+    if (musicBuf) {
+      const s = ctx.createBufferSource(); s.buffer = musicBuf; s.loop = true;
+      const g = ctx.createGain(); g.gain.value = vol; s.connect(g); g.connect(master); s.start();
+      loops.music = { gain: g, stop() { try { s.stop(); } catch {} try { g.disconnect(); } catch {} } };
+      return;
+    }
+    if (musicFailed) { startMusicProc(vol); return; }
+    setTimeout(() => { if (!loops.music) startMusic(vol); }, 150);   // wait for decode
+  }
+  function startMusicProc(vol) {
     const g = ctx.createGain(); g.gain.value = vol; g.connect(master);
     const bpm = 150, step = (60 / bpm) / 2;                 // 8th notes
     const bassSeq = [0, 0, 7, 0, 3, 0, 5, 2].map(s => 55 * Math.pow(2, s / 12));   // low minor-ish drive

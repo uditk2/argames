@@ -103,7 +103,7 @@ export default function DinoSurvival({ onExit }) {
       sfx.setLoop('run', pace > 0.05 ? clamp(0.18 + pace * 0.5, 0, 0.7) : 0, 0.75 + pace * 0.85);
       sfx.setLoop('music', 0.40 + near * 0.18);
       // (dino footfalls are triggered on the animation's foot-strike, not here)
-      if (near > 0.5 && now >= g.au.nextSnarl) { sfx.play('snarl', 0.3 + near * 0.4); g.au.nextSnarl = now + (2400 - near * 1200); }
+      // (periodic snarl removed — it read as an ugly recurring thud)
       if (near > 0.74 && !g.au.roared) { g.au.roared = true; sfx.play('roar', 0.9, 1.0); }
       else if (near < 0.6 && g.au.roared) { g.au.roared = false; }
     };
