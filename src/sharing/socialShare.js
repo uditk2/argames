@@ -22,6 +22,16 @@ import { BRAND } from '../config/brand.js';
 export function buildShareUrl(stats = {}, origin) {
   const base = origin || (typeof window !== 'undefined' ? window.location.origin : '');
   if (!base) return '';
+  // Dino Survival: { g:'dino', escaped, timeS, pct }. Time is sent as deci-seconds.
+  if (stats.g === 'dino') {
+    const p = new URLSearchParams({
+      g: 'dino',
+      esc: stats.escaped ? '1' : '0',
+      dt: String(Math.max(0, Math.round((stats.timeS ?? 0) * 10))),
+      pct: String(Math.max(0, Math.round(stats.pct ?? 0))),
+    });
+    return `${base}/s?${p.toString()}`;
+  }
   const p = new URLSearchParams({
     score: String(Math.max(0, Math.round(stats.score ?? 0))),
     slain: String(Math.max(0, Math.round(stats.slain ?? 0))),
@@ -34,6 +44,11 @@ export function buildShareUrl(stats = {}, origin) {
 
 /** Default share caption used by networks that accept text. */
 export function shareText(stats = {}) {
+  if (stats.g === 'dino') {
+    return stats.escaped
+      ? `I outran the beast and escaped in ${(stats.timeS ?? 0).toFixed(1)}s on ${BRAND.name} Dino Survival! 🦖 Can you beat my time?`
+      : `The beast caught me at ${Math.round(stats.pct ?? 0)}% on ${BRAND.name} Dino Survival 🦖 Can you escape?`;
+  }
   const score = (stats.score ?? 0).toLocaleString();
   return `I cleared the ${BRAND.name} realm — ${score} pts & ${stats.slain ?? 0} demons slain! 🔥 Can you beat it?`;
 }

@@ -30,49 +30,13 @@ async function lockOrientation(want) {
 // Punch asks for LANDSCAPE only once its actual gameplay starts (see DemonRealm).
 export default function App() {
   const [game, setGame] = useState(null); // null = menu | 'demon' | 'dino'
-  const pick = (g) => { if (g === 'dino') lockOrientation('portrait'); setGame(g); };  // demon locks landscape later, when its round starts
+  const pick = (g) => setGame(g);   // orientation is handled by the native app wrapper, not gated on the web
   return (
     <>
-      {game === 'dino' ? (
-        <><RotatePrompt want="portrait" /><DinoSurvival onExit={() => setGame(null)} /></>
-      ) : game === 'demon' ? <DemonRealm />
+      {game === 'dino' ? <DinoSurvival onExit={() => setGame(null)} />
+        : game === 'demon' ? <DemonRealm />
         : <GameMenu onPick={pick} />}
     </>
-  );
-}
-
-// Ask mobile players to rotate to the orientation a screen needs. `want` is the
-// desired orientation; the prompt only shows on small screens that are in the
-// WRONG orientation, and only while `enabled` (so menus/details don't nag).
-function RotatePrompt({ want = 'landscape', enabled = true }) {
-  const [show, setShow] = useState(false);
-  useEffect(() => {
-    const check = () => {
-      const isPortrait = window.matchMedia('(orientation: portrait)').matches;
-      const small = Math.min(window.innerWidth, window.innerHeight) < 820;
-      const wrong = want === 'landscape' ? isPortrait : !isPortrait;
-      setShow(enabled && small && wrong);
-    };
-    check();
-    window.addEventListener('resize', check);
-    window.addEventListener('orientationchange', check);
-    return () => { window.removeEventListener('resize', check); window.removeEventListener('orientationchange', check); };
-  }, [want, enabled]);
-  if (!show) return null;
-  const toPortrait = want === 'portrait';
-  return (
-    <div className="fixed inset-0 z-[999] bg-realm/95 backdrop-blur-sm flex items-center justify-center p-6 text-center">
-      <div className="panel p-8 max-w-[340px]">
-        <svg viewBox="0 0 64 64" className="w-16 h-16 mx-auto mb-4 text-magic" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-          <rect x="22" y="6" width="20" height="40" rx="3" />
-          <path d="M30 40h4" />
-          <path d="M48 30a18 18 0 0 1-12 14M16 34a18 18 0 0 1 12-14" />
-          <path d="M48 24v8h-8M16 40v-8h8" />
-        </svg>
-        <div className="font-display font-black text-xl text-ink">Rotate your device</div>
-        <p className="text-magic/80 text-[13px] mt-2 leading-relaxed">Turn your phone to <b className="text-ink">{toPortrait ? 'portrait' : 'landscape'}</b> to play — {toPortrait ? 'this game runs in a tall, vertical view.' : 'this game needs a wide stage to look and play its best.'}</p>
-      </div>
-    </div>
   );
 }
 
@@ -83,9 +47,9 @@ const GAMES = [
 
 function GameMenu({ onPick }) {
   return (
-    <div className="w-screen h-screen overflow-hidden bg-realm text-ink flex flex-col items-center justify-center p-6">
-      <div className="text-center mb-8">
-        <div className="font-display font-black text-4xl bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">SLAYFIT</div>
+    <div className="w-screen min-h-[100dvh] overflow-y-auto bg-realm text-ink flex flex-col items-center justify-center p-4 sm:p-6">
+      <div className="text-center mb-5 sm:mb-8">
+        <div className="font-display font-black text-3xl sm:text-4xl bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">SLAYFIT</div>
         <div className="text-[11px] tracking-[0.24em] text-magic/80 mt-1 uppercase">Move to play · pick a game</div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 w-full max-w-[680px]">
@@ -158,8 +122,7 @@ function DemonRealm() {
 
   return (
     <div className="w-screen h-screen overflow-hidden bg-realm text-ink">
-      {/* landscape only matters once the punch round is running; details stay portrait-friendly */}
-      <RotatePrompt want="landscape" enabled={screen === 'game'} />
+      {/* orientation gating removed on web — handled by the native app wrapper. */}
       {screen === 'start' && (
         <StartScreen initial={settings} onStart={startGame} />
       )}

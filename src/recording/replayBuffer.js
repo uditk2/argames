@@ -61,6 +61,105 @@ function detectSupport() {
   return { ok: true, mime, isMp4 };
 }
 
+/**
+ * Rebase fragmented-MP4 decode times to start at 0, IN PLACE.
+ * ---------------------------------------------------------------------------
+ * MediaRecorder writes each fragment's `tfdt` baseMediaDecodeTime as an ABSOLUTE
+ * time from recording start. When we keep only the last ~10s of fragments, those
+ * times are still ~Ns in, so a player shows a long empty lead-in and an inflated
+ * duration. We walk the box tree, find every `tfdt`, and subtract the FIRST one's
+ * value from all of them — so the clip timeline starts at 0. No re-encode.
+ * @param {ArrayBuffer} buffer  concatenated [ftyp+moov][moof+mdat…] — mutated.
+ */
+function rebaseFmp4(buffer) {
+  const u = new Uint8Array(buffer);
+  const dv = new DataView(buffer);
+  let offset = null; // first baseMediaDecodeTime seen = the amount to subtract
+  function walk(start, end) {
+    let p = start;
+    while (p + 8 <= end) {
+      let size = dv.getUint32(p);
+      const type = String.fromCharCode(u[p + 4], u[p + 5], u[p + 6], u[p + 7]);
+      let header = 8;
+      if (size === 1) { size = dv.getUint32(p + 8) * 4294967296 + dv.getUint32(p + 12); header = 16; }
+      else if (size === 0) { size = end - p; }
+      if (size < header || p + size > end) break;
+      const boxEnd = p + size;
+      if (type === 'moof' || type === 'traf') {
+        walk(p + header, boxEnd);                         // recurse to reach tfdt
+      } else if (type === 'tfdt') {
+        const c = p + header;                             // box content: version(1) flags(3) time
+        const ver = u[c];
+        if (ver === 1) {
+          const t = c + 4;
+          let val = dv.getUint32(t) * 4294967296 + dv.getUint32(t + 4);
+          if (offset === null) offset = val;
+          val = Math.max(0, val - offset);
+          dv.setUint32(t, Math.floor(val / 4294967296));
+          dv.setUint32(t + 4, val >>> 0);
+        } else {
+          const t = c + 4;
+          const val = dv.getUint32(t);
+          if (offset === null) offset = val;
+          dv.setUint32(t, Math.max(0, val - offset) >>> 0);
+        }
+      }
+      p = boxEnd;
+    }
+  }
+  walk(0, u.length);
+}
+
+/** Read an EBML variable-length integer at `p`. Returns { value, len } or null. */
+function ebmlVint(u, p) {
+  const b0 = u[p];
+  if (b0 === undefined || b0 === 0) return null;
+  let mask = 0x80, len = 1;
+  while (!(b0 & mask) && len <= 8) { mask >>= 1; len++; }
+  if (len > 8 || p + len > u.length) return null;
+  let value = b0 & (mask - 1);
+  for (let i = 1; i < len; i++) value = value * 256 + u[p + i];
+  return { value, len };
+}
+
+/**
+ * Rebase WebM (Matroska) cluster timecodes to start at 0, IN PLACE.
+ * ---------------------------------------------------------------------------
+ * The WebM analogue of the MP4 tfdt problem: each Cluster carries an absolute
+ * `Timecode` (0xE7) from recording start, so kept clusters sit ~Ns in. We scan
+ * for Cluster IDs (1F 43 B6 75), read each cluster's first child Timecode, and
+ * subtract the first one — writing back into the SAME byte width (rebased value
+ * is always ≤ original, so it fits). Block-relative timecodes are untouched
+ * (they're relative to the cluster). Used for the Firefox WebM fallback.
+ * @param {ArrayBuffer} buffer  mutated in place.
+ */
+function rebaseWebm(buffer) {
+  const u = new Uint8Array(buffer);
+  let offset = null, p = 0;
+  while (p + 4 < u.length) {
+    if (u[p] === 0x1F && u[p + 1] === 0x43 && u[p + 2] === 0xB6 && u[p + 3] === 0x75) {
+      const sz = ebmlVint(u, p + 4);                 // cluster size VINT (may be "unknown")
+      if (sz) {
+        const q = p + 4 + sz.len;                    // cluster content; first child should be Timecode
+        if (u[q] === 0xE7) {
+          const ln = ebmlVint(u, q + 1);
+          if (ln && ln.value >= 1 && ln.value <= 8) {
+            const n = ln.value, vpos = q + 1 + ln.len;
+            let tc = 0;
+            for (let i = 0; i < n; i++) tc = tc * 256 + u[vpos + i];
+            if (offset === null) offset = tc;
+            let nv = Math.max(0, tc - offset);
+            for (let i = n - 1; i >= 0; i--) { u[vpos + i] = nv & 0xff; nv = Math.floor(nv / 256); }
+            p = vpos + n;
+            continue;                                // resume scanning after this timecode
+          }
+        }
+      }
+    }
+    p++;
+  }
+}
+
 export function createReplayBuffer(opts = {}) {
   const windowMs = opts.windowMs ?? REPLAY.windowMs;
   const timesliceMs = opts.timesliceMs ?? REPLAY.timesliceMs;
@@ -85,6 +184,10 @@ export function createReplayBuffer(opts = {}) {
   let pixiCanvas = null;
   let mime = support.mime;
   let running = false;
+  // When true, the compositor draws the SCENE canvas full-frame and overlays a
+  // small webcam picture-in-picture near the avatar (only in the recorded clip —
+  // the live game never shows it). Used by games whose canvas is opaque (Dino).
+  let webcamInsetMode = false;
 
   /** Whether instant-replay capture is available in this browser. */
   const isSupported = support.ok;
@@ -98,12 +201,13 @@ export function createReplayBuffer(opts = {}) {
    *        backdrop when there's no webcam (kept simple: a flat realm fill).
    * @returns {boolean} true if capture started
    */
-  function start({ video = null, pixiCanvas: canvas, demoBg = null } = {}) {
+  function start({ video = null, pixiCanvas: canvas, demoBg = null, webcamInset = false } = {}) {
     if (!isSupported || !canvas) return false;
     if (running) return true;
     try {
       videoEl = video || null;
       pixiCanvas = canvas;
+      webcamInsetMode = !!webcamInset;
 
       // Size the compositor to the Pixi canvas (the on-screen drawing size).
       const w = canvas.width || 720;
@@ -155,20 +259,32 @@ export function createReplayBuffer(opts = {}) {
     }
   }
 
-  /** Draw one composite frame: webcam (mirrored) under, Pixi canvas over. */
+  /** Draw one composite frame. Two layouts:
+   *  • default (transparent FX canvas, e.g. Demon): webcam under, canvas over.
+   *  • inset (opaque scene canvas, e.g. Dino): scene full-frame, webcam PiP over. */
   function drawFrame(demoBg) {
     if (!ctx || !offscreen) return;
     const w = offscreen.width;
     const h = offscreen.height;
+    const camReady = videoEl && videoEl.readyState >= 2 && videoEl.videoWidth > 0;
 
-    // Base fill (also the demo backdrop when there's no camera).
     ctx.save();
     ctx.fillStyle = '#0a0510';
     ctx.fillRect(0, 0, w, h);
     ctx.restore();
 
+    if (webcamInsetMode) {
+      // Opaque scene first, then a small webcam picture-in-picture near the avatar
+      // (clip-only — never shown live). Demo / no-camera just records the scene.
+      if (pixiCanvas && pixiCanvas.width > 0) {
+        try { ctx.drawImage(pixiCanvas, 0, 0, w, h); } catch { /* skip */ }
+      }
+      if (camReady) drawWebcamInset(ctx, videoEl, w, h);
+      return;
+    }
+
     // (1) Webcam frame, object-cover + horizontal mirror to match the screen.
-    if (videoEl && videoEl.readyState >= 2 && videoEl.videoWidth > 0) {
+    if (camReady) {
       drawCover(ctx, videoEl, videoEl.videoWidth, videoEl.videoHeight, w, h, mirror);
     } else if (demoBg) {
       // Demo / no-camera: a soft accent realm glow so the clip isn't empty.
@@ -187,6 +303,50 @@ export function createReplayBuffer(opts = {}) {
         /* canvas may be transiently untainted/empty; skip this frame */
       }
     }
+  }
+
+  /** Rounded-rectangle path on a 2D context. */
+  function roundRectPath(c, x, y, rw, rh, r) {
+    c.beginPath();
+    c.moveTo(x + r, y);
+    c.arcTo(x + rw, y, x + rw, y + rh, r);
+    c.arcTo(x + rw, y + rh, x, y + rh, r);
+    c.arcTo(x, y + rh, x, y, r);
+    c.arcTo(x, y, x + rw, y, r);
+    c.closePath();
+  }
+
+  /** Webcam picture-in-picture, bottom-left near the avatar, rounded + bordered.
+   *  Object-cover + mirror to match how the player saw themselves. */
+  function drawWebcamInset(c, src, W, H) {
+    const sw = src.videoWidth, sh = src.videoHeight;
+    if (!sw || !sh) return;
+    const iw = Math.round(W * 0.26);                  // ~quarter width
+    const ih = Math.round(iw * 1.25);                 // portrait-ish PiP
+    const m = Math.round(W * 0.035);                  // margin from the edges
+    const x = m, y = H - ih - m;                      // bottom-left, beside the centered avatar
+    const r = Math.round(iw * 0.09);
+
+    // Image (clipped to the rounded rect, mirrored, object-cover).
+    c.save();
+    roundRectPath(c, x, y, iw, ih, r);
+    c.clip();
+    c.translate(x, y);
+    if (mirror) { c.translate(iw, 0); c.scale(-1, 1); }
+    const scale = Math.max(iw / sw, ih / sh);
+    const rw = sw * scale, rh = sh * scale;
+    c.drawImage(src, (iw - rw) / 2, (ih - rh) / 2, rw, rh);
+    c.restore();
+
+    // Border + soft shadow so it reads as a deliberate inset.
+    c.save();
+    roundRectPath(c, x, y, iw, ih, r);
+    c.shadowColor = 'rgba(0,0,0,0.5)';
+    c.shadowBlur = Math.round(W * 0.02);
+    c.lineWidth = Math.max(2, Math.round(W * 0.005));
+    c.strokeStyle = rgba.magic(0.9);
+    c.stroke();
+    c.restore();
   }
 
   /** object-cover blit with optional horizontal mirror. */
@@ -239,9 +399,10 @@ export function createReplayBuffer(opts = {}) {
 
   /**
    * Assemble the most recent ~windowMs of footage into a single clip.
-   * @returns {{ blob: Blob, url: string, mime: string, durationSec: number }|null}
+   * Async because we read the bytes to rebase MP4 fragment timestamps (below).
+   * @returns {Promise<{ blob: Blob, url: string, mime: string, durationSec: number }|null>}
    */
-  function getLastClip() {
+  async function getLastClip() {
     if (!chunks.length) return null;
     const cutoff = performance.now() - (windowMs + timesliceMs);
     const recent = chunks.filter((c) => c.t >= cutoff);
@@ -253,8 +414,29 @@ export function createReplayBuffer(opts = {}) {
     const parts = [];
     if (headBlob && (!use.length || use[0].blob !== headBlob)) parts.push(headBlob);
     for (const c of use) parts.push(c.blob);
-    const blob = new Blob(parts, { type });
+    let blob = new Blob(parts, { type });
     if (!blob.size) return null;
+    // The kept MP4 fragments retain their ORIGINAL absolute decode times (e.g.
+    // ~30s into the run), so a player reports a 40s clip with a 30s empty
+    // lead-in. Rebase every fragment's tfdt so the clip starts at t=0 — a clean
+    // ~windowMs clip with no re-encode. (WebM left as-is; MP4 is the shared path.)
+    if (type.includes('mp4')) {
+      try {
+        const ab = await blob.arrayBuffer();
+        rebaseFmp4(ab);
+        blob = new Blob([ab], { type });
+      } catch (e) {
+        console.warn('[replayBuffer] tfdt rebase skipped:', e);
+      }
+    } else if (type.includes('webm')) {
+      try {
+        const ab = await blob.arrayBuffer();
+        rebaseWebm(ab);
+        blob = new Blob([ab], { type });
+      } catch (e) {
+        console.warn('[replayBuffer] webm timecode rebase skipped:', e);
+      }
+    }
     const url = URL.createObjectURL(blob);
     const durationSec = Math.min(windowMs, use.length * timesliceMs) / 1000;
     return { blob, url, mime: type, durationSec };

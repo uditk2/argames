@@ -47,7 +47,7 @@ export default function StartScreen({ initial, onStart }) {
   };
 
   return (
-    <div className="relative w-full h-full flex items-center justify-center overflow-hidden">
+    <div className="relative w-full h-full overflow-hidden">
       {/* Ambient background */}
       <img
         src="/assets/backgrounds/Cloudy_Sky-Night_01-1024x512.png"
@@ -57,17 +57,22 @@ export default function StartScreen({ initial, onStart }) {
       <div className="absolute inset-0 bg-gradient-to-b from-[rgba(90,30,110,.45)] via-[rgba(16,8,30,.7)] to-[rgba(8,4,16,.92)]" />
       <div className="absolute left-1/2 top-[58%] w-[520px] h-[520px] -ml-[260px] -mt-[260px] rounded-full border-2 border-dashed border-magic/30 animate-spin-slow shadow-[0_0_60px_rgb(var(--magic-rgb)/.2)_inset]" />
 
+      {/* Scrollable layer over the fixed background: centers the card when it fits,
+          scrolls when it's taller, so the whole form is reachable on portrait phones. */}
+      <div className="absolute inset-0 overflow-y-auto overscroll-contain">
+        <div className="min-h-full flex items-center justify-center p-3 sm:p-4">
+
       {/* Leaderboard overlay */}
       {showBoard && (
-        <div className="relative z-10 panel p-7 w-[min(92vw,480px)]">
+        <div className="relative z-10 panel p-6 sm:p-7 w-[min(92vw,480px)] my-auto">
           <Leaderboard client={punchScores} level={PUNCH_LEVEL} label="Arena" onClose={() => setShowBoard(false)} />
         </div>
       )}
 
       {/* Card */}
       {!showBoard && (
-      <div className="relative z-10 panel p-8 w-[min(92vw,460px)]">
-        <div className="text-center mb-6">
+      <div className="relative z-10 panel p-6 sm:p-8 w-[min(92vw,460px)] my-auto">
+        <div className="text-center mb-4 sm:mb-6">
           <div className="text-[10px] tracking-[0.3em] text-magic/60 uppercase mb-1">{BRAND.wordmark}</div>
           <div className="font-display font-black text-3xl bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">
             MONSTER PUNCH
@@ -78,13 +83,13 @@ export default function StartScreen({ initial, onStart }) {
         </div>
 
         {/* Avatar preview (read from registry) */}
-        <div className="flex flex-col items-center mb-6">
+        <div className="flex flex-col items-center mb-4 sm:mb-6">
           <div className="relative">
             <div className="absolute inset-0 -m-6 rounded-full bg-magic/30 blur-2xl animate-pulse-soft" />
             <img
               src={avatar.sprites.idle}
               alt={avatar.name}
-              className="relative h-40 object-contain drop-shadow-[0_0_16px_rgb(var(--magic-rgb)/.55)]"
+              className="relative h-28 sm:h-40 object-contain drop-shadow-[0_0_16px_rgb(var(--magic-rgb)/.55)]"
             />
           </div>
           <div className="mt-2 text-sm text-ink/90">{avatar.name}</div>
@@ -188,6 +193,8 @@ export default function StartScreen({ initial, onStart }) {
         </p>
       </div>
       )}
+        </div>
+      </div>
     </div>
   );
 }

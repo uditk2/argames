@@ -201,16 +201,19 @@ export default function GameScreen({ settings, onFinish, onQuit }) {
         if (finished) {
           // Round over (timer hit 0): grab the last ~10s clip BEFORE we stop the
           // recorder, then hand it to results along with the final state.
-          let clip = null;
-          try {
-            if (replayRef.current) {
-              clip = replayRef.current.getLastClip();
-              replayRef.current.stop();
+          // getLastClip is async (it rebases MP4 timestamps), so collect then finish.
+          (async () => {
+            let clip = null;
+            try {
+              if (replayRef.current) {
+                clip = await replayRef.current.getLastClip();
+                replayRef.current.stop();
+              }
+            } catch (e) {
+              console.warn('[GameScreen] replay collect failed:', e);
             }
-          } catch (e) {
-            console.warn('[GameScreen] replay collect failed:', e);
-          }
-          onFinishRef.current(game.state, clip);
+            onFinishRef.current(game.state, clip);
+          })();
           return;
         }
         rafId = requestAnimationFrame(loop);

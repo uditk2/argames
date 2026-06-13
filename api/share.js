@@ -42,19 +42,28 @@ export default function handler(req, res) {
   const host = req.headers['x-forwarded-host'] || req.headers.host || 'localhost';
   const origin = `${proto}://${host}`;
 
-  const ogParams = new URLSearchParams({
-    score: String(score), slain: String(slain), kcal: String(kcal), t: String(durationSec),
-  });
-  if (combo != null) ogParams.set('combo', String(combo));
+  let ogParams, title, desc;
+  if (q.g === 'dino') {
+    // Dino Survival: esc (1|0), dt (escape/survive time in deci-seconds), pct (distance %).
+    const escaped = q.esc === '1';
+    const dt = int(q.dt);
+    const pct = int(q.pct);
+    const timeS = (dt / 10).toFixed(1);
+    ogParams = new URLSearchParams({ g: 'dino', esc: escaped ? '1' : '0', dt: String(dt), pct: String(pct) });
+    title = escaped ? `Escaped the dino in ${timeS}s` : `Caught at ${pct}% by the dino`;
+    desc = escaped
+      ? `I outran the beast and reached the jeep in ${timeS}s on ${BRAND.name} Dino Survival. Can you beat my time?`
+      : `The beast caught me at ${pct}% on ${BRAND.name} Dino Survival. Can you escape?`;
+  } else {
+    ogParams = new URLSearchParams({ score: String(score), slain: String(slain), kcal: String(kcal), t: String(durationSec) });
+    if (combo != null) ogParams.set('combo', String(combo));
+    title = `${score.toLocaleString()} pts in ${BRAND.name}`;
+    desc = `I cleared the realm — ${slain} demons slain, ${kcal} kcal burned in ${fmtDur(durationSec)}. Think you can beat it?`;
+  }
 
   const imageUrl = `${origin}/api/og?${ogParams.toString()}`;
   const pageUrl = `${origin}/s?${ogParams.toString()}`;
   const playUrl = `${origin}/`;
-
-  const title = `${score.toLocaleString()} pts in ${BRAND.name}`;
-  const desc =
-    `I cleared the realm — ${slain} demons slain, ${kcal} kcal burned in ${fmtDur(durationSec)}.` +
-    ` Think you can beat it?`;
 
   const html = `<!DOCTYPE html>
 <html lang="en">

@@ -93,9 +93,78 @@ function chip(label, value, color) {
   );
 }
 
+// Dino Survival card — ESCAPED (escape time) or CAUGHT (distance reached).
+// Params: esc (1|0), dt (escape/survive time in DECI-seconds), pct (distance %).
+async function dinoImage(searchParams) {
+  const escaped = searchParams.get('esc') === '1';
+  const timeS = intParam(searchParams.get('dt')) / 10;
+  const pct = intParam(searchParams.get('pct'));
+  const big = escaped ? `${timeS.toFixed(1)}s` : `${pct}%`;
+  const accent = escaped ? C.gold : C.fire;
+  const [cinzel, fredoka] = await Promise.all([
+    loadGoogleFont('Cinzel Decorative', 900, `${CHARSET}${big}`),
+    loadGoogleFont('Fredoka', 600, CHARSET),
+  ]);
+  const tree = h(
+    'div',
+    {
+      style: {
+        width: W, height: H, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 64,
+        backgroundColor: C.realm,
+        backgroundImage:
+          'radial-gradient(120% 80% at 50% 115%, rgba(255,122,60,0.40) 0%, rgba(255,122,60,0) 55%),' +
+          'radial-gradient(110% 70% at 50% -15%, rgba(255,182,39,0.34) 0%, rgba(255,182,39,0) 55%),' +
+          `linear-gradient(160deg, ${C.realm2} 0%, ${C.realm} 70%)`,
+        color: C.ink,
+      },
+    },
+    h(
+      'div',
+      { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+      h(
+        'div',
+        { style: { display: 'flex', flexDirection: 'column' } },
+        h('span', { style: { fontFamily: 'Cinzel', fontSize: 56, color: C.gold, letterSpacing: 2 } }, BRAND.wordmark),
+        h('span', { style: { fontFamily: 'Fredoka', fontSize: 24, color: 'rgba(255,182,39,0.85)', letterSpacing: 6 } }, 'DINO SURVIVAL')
+      ),
+      h(
+        'div',
+        { style: { display: 'flex', fontFamily: 'Fredoka', fontSize: 24, letterSpacing: 6, color: C.ink, padding: '12px 24px', borderRadius: 999, background: 'rgba(255,122,60,0.18)', border: `1px solid ${accent}` } },
+        escaped ? 'ESCAPED' : 'CAUGHT'
+      )
+    ),
+    h(
+      'div',
+      { style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' } },
+      h(
+        'div',
+        { style: { display: 'flex', flexDirection: 'column' } },
+        h('span', { style: { fontFamily: 'Fredoka', fontSize: 30, letterSpacing: 8, color: 'rgba(250,244,233,0.65)' } }, escaped ? 'ESCAPE TIME' : 'DISTANCE REACHED'),
+        h('span', { style: { fontFamily: 'Cinzel', fontSize: 200, lineHeight: 1, color: '#ffffff' } }, big),
+        h('span', { style: { fontFamily: 'Fredoka', fontSize: 30, color: C.fireBright, marginTop: 8 } }, escaped ? 'Outran the beast' : 'The beast caught you')
+      ),
+      h(
+        'div',
+        { style: { display: 'flex', flexDirection: 'column', gap: 16 } },
+        chip('OUTCOME', escaped ? 'ESCAPED' : 'CAUGHT', accent),
+        chip(escaped ? 'DISTANCE' : 'SURVIVED', escaped ? '100%' : `${timeS.toFixed(1)}s`, C.magic)
+      )
+    )
+  );
+  return new ImageResponse(tree, {
+    width: W, height: H,
+    fonts: [
+      { name: 'Cinzel', data: cinzel, weight: 900, style: 'normal' },
+      { name: 'Fredoka', data: fredoka, weight: 600, style: 'normal' },
+    ],
+    headers: { 'cache-control': 'public, immutable, no-transform, max-age=31536000' },
+  });
+}
+
 export default async function handler(req) {
   try {
     const { searchParams } = new URL(req.url);
+    if (searchParams.get('g') === 'dino') return await dinoImage(searchParams);
     const score = intParam(searchParams.get('score'));
     const slain = intParam(searchParams.get('slain'));
     const kcal = intParam(searchParams.get('kcal'));

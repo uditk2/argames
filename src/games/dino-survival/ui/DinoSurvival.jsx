@@ -19,6 +19,11 @@ import { createReplayBuffer } from '../../../recording/replayBuffer.js';
 import { dinoScores as scores } from '../../../net/gameClients.js';
 import { getName, setName, getCountry, setCountry as persistCountry, flagEmoji } from '../../../net/identity.js';
 import Leaderboard from '../../../ui/Leaderboard.jsx';
+import { shareFile } from '../../../sharing/share.js';
+import { openSocialShare, copyShareLink, shareText } from '../../../sharing/socialShare.js';
+
+// phone vs desktop — only phones "hold the device away"; desktops "move back".
+const IS_PHONE = typeof navigator !== 'undefined' && /Mobi|Android|iPhone|iPod/i.test(navigator.userAgent || '');
 
 export default function DinoSurvival({ onExit }) {
   const canvasRef = useRef(null), videoRef = useRef(null), caughtVideoRef = useRef(null), escapeVideoRef = useRef(null), G = useRef({});
@@ -42,6 +47,7 @@ export default function DinoSurvival({ onExit }) {
   const [country, setCountry] = useState(() => getCountry());  // ISO-2, detected at play start
   const [showBoard, setShowBoard] = useState(false);           // leaderboard overlay on intro
   const [board, setBoard] = useState(null);                    // top rows from last submit (no extra call)
+  const [shareNote, setShareNote] = useState('');              // small status line under the share buttons
 
   // teardown
   const teardown = useCallback(() => {
@@ -116,13 +122,15 @@ export default function DinoSurvival({ onExit }) {
         pose.start((lm, vid, mask) => {
           latestLM = lm; latestVid = vid;   // segmentation removed — avatar is a baked sprite now
           if (phase === 'calibrating') {
-            if (framed(lm)) {
+            const aVis = (i) => lm && lm[i] && (lm[i].visibility == null || lm[i].visibility > 0.4);
+            const fullBody = framed(lm) && aVis(27) && aVis(28);   // hips+knees+ankles all in frame
+            if (fullBody) {
               if (!g.calDone) { det.calibrate(lm); g.calDone = true; }   // capture the standing baseline once
               // legs track far better once they're MOVING, so we start on a few
               // detected steps rather than a still full-body pose.
               if (det.stats().steps >= 3) { phase = 'countdown'; countTo = performance.now() + 3000; setCalib(null); }
-              else setCalib({ msg: 'Run in place to start', sub: 'lift your knees so we can read your stride', ok: true });
-            } else { g.calDone = false; setCalib({ msg: 'Step back & run in place', sub: 'get your knees AND feet in frame, then jog', ok: false }); }
+              else setCalib({ msg: 'Run in place to start', sub: 'keep going — capturing your stride', ok: true });
+            } else { g.calDone = false; setCalib({ msg: 'Step back a little', sub: IS_PHONE ? 'set your phone further back so your whole body shows' : 'move back so your whole body shows', ok: false }); }
           }
         });
       } catch (e) {
@@ -155,7 +163,7 @@ export default function DinoSurvival({ onExit }) {
 
     // 10s instant-replay (composites webcam + scene canvas)
     try { const replay = createReplayBuffer(); g.replay = replay;
-      replay.start({ video: mode === 'camera' ? videoRef.current : null, pixiCanvas: cv, demoBg: mode === 'demo' ? true : null }); } catch { g.replay = null; }
+      replay.start({ video: mode === 'camera' ? videoRef.current : null, pixiCanvas: cv, demoBg: mode === 'demo' ? true : null, webcamInset: true }); } catch { g.replay = null; }
 
     surv.reset();
     setScreen('playing');
@@ -205,7 +213,7 @@ export default function DinoSurvival({ onExit }) {
       const groundY = scene.drawBgSeq(ctx, W, H, bgPos);   // float pos -> crossfaded frames (smooth + seamless wrap)
       if (phase === 'escaped') {
         // fullscreen escape video handles the win cutscene (loop stops below)
-      } else {
+      } else if (phase !== 'calibrating') {   // calibration shows the live skeleton instead (below)
         const near = scene.drawDino(ctx, W, H, groundY, snap.gap, now);
         camNear += (near - camNear) * 0.12;                 // smoothed closeness for the camera
         // stomp lands on the dino's actual foot-plant (scene reports the strike),
@@ -216,9 +224,12 @@ export default function DinoSurvival({ onExit }) {
         // measure that drives the ground — so the runner always moves in lockstep
         // with the world. While idle, we pose-match your live skeleton (arms/standing
         // follow you), falling back to standing if the pose is off (ducking/arbitrary).
+        // Telemetry is the authority on run-vs-idle; pose-matching only refines WITHIN
+        // "you're moving". Running (pace) -> run cycle. Some cadence (spm>0) -> pose-match
+        // your body. No cadence (spm===0, standing) -> stand, so it can't grab a run frame.
         let rIdx, offPose = false;
         if (pace > 0.05) { runnerPos += pace * dt * 0.012; rIdx = RUNNER_RUN_START + (runnerPos % RUNNER_RUN_LEN); }   // seamless single-stride loop, ~natural rate
-        else if (mode === 'camera' && lm) {
+        else if (mode === 'camera' && lm && spm > 0) {
           rIdx = runner.pickFrame(lm);
           if (runner.matchDist() > RUNNER_OFF_DIST) { rIdx = RUNNER_IDLE_FRAME; offPose = true; }
         } else rIdx = RUNNER_IDLE_FRAME;
@@ -234,7 +245,10 @@ export default function DinoSurvival({ onExit }) {
         ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.font = '900 120px system-ui'; ctx.fillText(n > 0 ? n : 'RUN!', W / 2, H / 2 + 30); }
       scene.endCamera(ctx);
       // speed lines stream in screen space, on top of the moving frame (top-speed accent).
-      if (phase !== 'escaped') scene.drawSpeedLines(ctx, W, H, pace, now);
+      if (phase !== 'escaped' && phase !== 'calibrating') scene.drawSpeedLines(ctx, W, H, pace, now);
+      // CALIBRATION: lightly dim the scene; the small animated runner figure in the
+      // calib panel is the cue (green when your whole body is in frame).
+      if (phase === 'calibrating') { ctx.fillStyle = 'rgba(7,6,15,0.5)'; ctx.fillRect(0, 0, W, H); }
 
       hudAcc += dt; if (hudAcc > 100) { hudAcc = 0; setHud({ t: snap.t, pace, spm, distPct: snap.distPct }); setKeepRun(keepRunWarn);
         if (g.debug) { const gr = scene.getGround(); const nF = (assets.bgLoop && assets.bgLoop.length) || 1;
@@ -299,8 +313,13 @@ export default function DinoSurvival({ onExit }) {
           if (srv.leaderboard) setBoard(srv.leaderboard);
           setResult((prev) => (prev === r ? { ...r, isNew: srv.isPB } : prev));
         });
-      let cl = null; try { cl = G.current.replay && G.current.replay.getLastClip(); G.current.replay && G.current.replay.stop(); } catch {}
-      setClip(cl || null); G.current.clipUrl = cl ? cl.url : null;   // tracked so we can revoke it next run (off-heap blob leak)
+      // getLastClip is async (rebases MP4 timestamps so the clip starts at 0, no
+      // dead lead-in); collect it, then update state.
+      (async () => {
+        let cl = null;
+        try { if (G.current.replay) { cl = await G.current.replay.getLastClip(); G.current.replay.stop(); } } catch {}
+        setClip(cl || null); G.current.clipUrl = cl ? cl.url : null;   // tracked so we can revoke it next run (off-heap blob leak)
+      })();
       // ---- run analytics ----
       const st = det.stats(); const totLR = st.stepsL + st.stepsR;
       const avgCad = spmCnt ? Math.round(spmSum / spmCnt) : 0;
@@ -333,30 +352,46 @@ export default function DinoSurvival({ onExit }) {
   }
 
   // ---- share helpers ----
-  async function dlOrShare(blob, name, title) {
-    const file = new File([blob], name, { type: blob.type });
-    try { if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], title }); return; } } catch {}
-    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 3000);
+  // The run as the shape the sharing module understands (drives caption + the
+  // /s page whose og:image is the dynamic dino /api/og card).
+  const dinoStats = () => ({ g: 'dino', escaped: !!(result && result.escaped), timeS: result ? result.timeS : 0, pct: result ? result.pct : 0 });
+  const noteMethod = (m) => (m === 'share' ? 'Shared!' : m === 'download' ? 'Downloaded (share sheet unavailable)' : 'Sharing not supported here');
+
+  // Build the portrait result card as a PNG blob (for direct file sharing).
+  function buildCardBlob() {
+    return new Promise((resolve) => {
+      const a = G.current.assets || {}; const c = document.createElement('canvas'); c.width = 1080; c.height = 1080; const g = c.getContext('2d');
+      g.fillStyle = '#0c0a1f'; g.fillRect(0, 0, 1080, 1080);
+      if (a.bgTrail) { const im = a.bgTrail, s = Math.max(1080 / im.naturalWidth, 720 / im.naturalHeight); g.globalAlpha = .55; g.drawImage(im, (1080 - im.naturalWidth * s) / 2, 0, im.naturalWidth * s, im.naturalHeight * s); g.globalAlpha = 1; }
+      g.fillStyle = '#000a'; g.fillRect(0, 0, 1080, 1080); g.textAlign = 'center';
+      g.fillStyle = '#a06bff'; g.font = '900 46px system-ui'; g.fillText('SLAYFIT · DINO SURVIVAL — ' + LEVELS[level].label.toUpperCase(), 540, 150);
+      if (result.escaped) { g.fillStyle = '#7dffa0'; g.font = '900 120px system-ui'; g.fillText('ESCAPED', 540, 410);
+        g.fillStyle = '#fff'; g.font = '900 210px system-ui'; g.fillText(result.timeS.toFixed(1) + 's', 540, 660); }
+      else { g.fillStyle = '#ff6b8a'; g.font = '900 120px system-ui'; g.fillText('CAUGHT', 540, 410);
+        g.fillStyle = '#fff'; g.font = '900 210px system-ui'; g.fillText(result.pct + '%', 540, 660); }
+      g.fillStyle = '#cfc7e6'; g.font = '600 46px system-ui'; g.fillText(result.escaped ? ('Personal best: ' + (best.escape != null ? best.escape.toFixed(1) + 's' : '—')) : 'Can you reach the jeep?', 540, 880);
+      g.fillStyle = '#ff7a3c'; g.font = '800 40px system-ui'; g.fillText('outrun the beast · slayfit', 540, 980);
+      c.toBlob((b) => resolve(b), 'image/png');
+    });
   }
-  function shareCard() {
-    const a = G.current.assets || {}; const c = document.createElement('canvas'); c.width = 1080; c.height = 1080; const g = c.getContext('2d');
-    g.fillStyle = '#0c0a1f'; g.fillRect(0, 0, 1080, 1080);
-    if (a.bgTrail) { const im = a.bgTrail, s = Math.max(1080 / im.naturalWidth, 720 / im.naturalHeight); g.globalAlpha = .55; g.drawImage(im, (1080 - im.naturalWidth * s) / 2, 0, im.naturalWidth * s, im.naturalHeight * s); g.globalAlpha = 1; }
-    g.fillStyle = '#000a'; g.fillRect(0, 0, 1080, 1080); g.textAlign = 'center';
-    g.fillStyle = '#a06bff'; g.font = '900 46px system-ui'; g.fillText('SLAYFIT · DINO SURVIVAL — ' + LEVELS[level].label.toUpperCase(), 540, 150);
-    if (result.escaped) { g.fillStyle = '#7dffa0'; g.font = '900 120px system-ui'; g.fillText('ESCAPED', 540, 410);
-      g.fillStyle = '#fff'; g.font = '900 210px system-ui'; g.fillText(result.timeS.toFixed(1) + 's', 540, 660); }
-    else { g.fillStyle = '#ff6b8a'; g.font = '900 120px system-ui'; g.fillText('CAUGHT', 540, 410);
-      g.fillStyle = '#fff'; g.font = '900 210px system-ui'; g.fillText(result.pct + '%', 540, 660); }
-    g.fillStyle = '#cfc7e6'; g.font = '600 46px system-ui'; g.fillText(result.escaped ? ('Personal best: ' + (best.escape != null ? best.escape.toFixed(1) + 's' : '—')) : 'Can you reach the jeep?', 540, 880);
-    g.fillStyle = '#ff7a3c'; g.font = '800 40px system-ui'; g.fillText('outrun the beast · slayfit', 540, 980);
-    c.toBlob(b => dlOrShare(b, 'slayfit-dino-survival.png', 'SlayFit Dino Survival'), 'image/png');
+  // Share the result card image as a FILE (native share sheet on mobile — incl.
+  // Instagram/WhatsApp/X — or download on desktop).
+  async function shareCard() {
+    setShareNote('');
+    try { const b = await buildCardBlob(); if (!b) return; const res = await shareFile({ blob: b, filename: 'slayfit-dino-survival.png', title: 'SlayFit Dino Survival', text: shareText(dinoStats()) }); setShareNote(noteMethod(res.method)); }
+    catch { setShareNote('Could not share the image.'); }
   }
-  function shareClip() {
+  // Share the 10s replay clip as a FILE (same native-sheet path).
+  async function shareClip() {
     if (!clip || !clip.blob) return;
-    const ext = ((clip.mime || clip.blob.type || '').includes('mp4')) ? 'mp4' : 'webm';   // mp4 where the browser recorded it
-    dlOrShare(clip.blob, `slayfit-dino-survival.${ext}`, 'My Dino Survival run');
+    setShareNote('');
+    const ext = ((clip.mime || clip.blob.type || '').includes('mp4')) ? 'mp4' : 'webm';
+    try { const res = await shareFile({ blob: clip.blob, filename: `slayfit-dino-survival.${ext}`, title: 'My Dino Survival run', text: shareText(dinoStats()) }); setShareNote(noteMethod(res.method)); }
+    catch { setShareNote('Could not share the clip.'); }
   }
+  // Post to a social network — opens the /s page whose OG preview is the dino card.
+  function onSocial(network, label) { const ok = openSocialShare(network, dinoStats()); setShareNote(ok ? `Opening ${label}…` : `Couldn't open ${label}.`); }
+  async function onCopyLink() { const ok = await copyShareLink(dinoStats()); setShareNote(ok ? 'Share link copied!' : "Couldn't copy the link."); }
 
   // master mute — drives the audio engine (if running) and persists either way
   const toggleMute = useCallback(() => {
@@ -450,9 +485,10 @@ export default function DinoSurvival({ onExit }) {
           )}
           {calib && (
             <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center z-[6]">
-              <div className="panel px-8 py-5">
-                <div className="text-2xl md:text-3xl font-extrabold text-ink">{calib.msg}</div>
-                <div className={`text-base md:text-lg mt-1 ${calib.ok ? 'text-shield' : 'text-magic/70'}`}>{calib.sub}</div>
+              <div className="panel px-6 py-4">
+                <RunnerFigure ready={calib.ok} />
+                <div className={`text-lg md:text-xl font-extrabold mt-1 ${calib.ok ? 'text-emerald-300' : 'text-ink'}`}>{calib.msg}</div>
+                <div className={`text-xs md:text-sm mt-0.5 ${calib.ok ? 'text-emerald-300/80' : 'text-magic/70'}`}>{calib.sub}</div>
               </div>
             </div>
           )}
@@ -565,11 +601,22 @@ export default function DinoSurvival({ onExit }) {
 
           <div className="flex gap-2 justify-center flex-wrap mt-1.5">
             <button onClick={() => startGame(G.current.mode || 'camera')} className="px-5 py-2.5 rounded-xl font-bold text-white bg-gradient-to-r from-fire to-magic shadow-glow-fire hover:brightness-110 transition">Run again</button>
-            <button onClick={shareCard} className="px-4 py-2.5 rounded-xl font-semibold text-ink/90 bg-realm/50 border border-magic/30 hover:border-magic/60 transition">Share card</button>
-            <button onClick={shareClip} disabled={!clip || !clip.blob} className="px-4 py-2.5 rounded-xl font-semibold text-ink/90 bg-realm/50 border border-magic/30 hover:border-magic/60 transition disabled:opacity-40">Share 10s clip</button>
+            <button onClick={shareClip} disabled={!clip || !clip.blob} className="px-4 py-2.5 rounded-xl font-semibold text-ink/90 bg-realm/50 border border-magic/30 hover:border-magic/60 transition disabled:opacity-40">Share clip</button>
+            <button onClick={shareCard} className="px-4 py-2.5 rounded-xl font-semibold text-ink/90 bg-realm/50 border border-magic/30 hover:border-magic/60 transition">Share image</button>
             {onExit && <button onClick={onExit} className="px-4 py-2.5 rounded-xl font-semibold text-ink/80 bg-realm/50 border border-magic/30 hover:border-magic/60 transition">← Back</button>}
             <button onClick={downloadTelemetry} title="download run telemetry (debug)" className="px-3 py-2.5 rounded-xl font-semibold text-ink/50 bg-realm/40 border border-magic/20 hover:border-magic/50 transition text-xs">⬇ telemetry</button>
           </div>
+
+          {/* Post to a social network — opens a link whose preview is the dynamic dino OG card. */}
+          <div className="flex gap-1.5 justify-center flex-wrap items-center mt-2.5">
+            <span className="text-[11px] text-magic/60 mr-0.5">Post to:</span>
+            {[['x', 'X'], ['facebook', 'Facebook'], ['linkedin', 'LinkedIn'], ['whatsapp', 'WhatsApp']].map(([k, label]) => (
+              <button key={k} onClick={() => onSocial(k, label)} className="text-[11px] px-2.5 py-1.5 rounded-lg font-semibold text-magic bg-realm/60 border border-magic/30 hover:bg-realm/90 hover:border-magic/60 transition">{label}</button>
+            ))}
+            <button onClick={onCopyLink} className="text-[11px] px-2.5 py-1.5 rounded-lg font-semibold text-magic bg-realm/60 border border-magic/30 hover:bg-realm/90 hover:border-magic/60 transition">Copy link</button>
+          </div>
+          {shareNote && <p className="text-[12px] text-magic/80 mt-2">{shareNote}</p>}
+          <p className="text-[10px] text-magic/40 mt-1 leading-relaxed">X / Facebook / LinkedIn open a link preview of your result card. “Share clip” &amp; “Share image” post the file directly — the share sheet on mobile (Instagram, WhatsApp, X…) or a download on desktop.</p>
           {(!clip || !clip.blob) && <p className="text-[11px] text-magic/60 mt-2">clip capture unavailable on this browser</p>}
         </Center>
       )}
@@ -582,6 +629,34 @@ const Stat = ({ v, k }) => (
     <div className="font-black text-xl leading-none text-ink">{v}</div>
     <div className="text-[9px] tracking-[0.14em] uppercase text-magic/70 mt-1">{k}</div>
   </div>
+);
+
+// Small "run in place" stick-figure for calibration — always animates the run so
+// it demos what to do, and turns GREEN once your whole body is in frame.
+const RunnerFigure = ({ ready }) => (
+  <svg viewBox="0 0 100 150" className="w-14 h-20 mx-auto" style={{ color: ready ? '#36ef76' : '#cdb3ff' }} aria-hidden="true">
+    <style>{`
+      @keyframes df_bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+      @keyframes df_lA{0%,100%{transform:rotate(26deg)}50%{transform:rotate(-26deg)}}
+      @keyframes df_lB{0%,100%{transform:rotate(-26deg)}50%{transform:rotate(26deg)}}
+      @keyframes df_aA{0%,100%{transform:rotate(-36deg)}50%{transform:rotate(36deg)}}
+      @keyframes df_aB{0%,100%{transform:rotate(36deg)}50%{transform:rotate(-36deg)}}
+      .df_fig{animation:df_bob .5s infinite ease-in-out}
+      .df_lA,.df_lB,.df_aA,.df_aB{transform-box:view-box}
+      .df_lA{transform-origin:50px 88px;animation:df_lA .5s infinite ease-in-out}
+      .df_lB{transform-origin:50px 88px;animation:df_lB .5s infinite ease-in-out}
+      .df_aA{transform-origin:50px 48px;animation:df_aA .5s infinite ease-in-out}
+      .df_aB{transform-origin:50px 48px;animation:df_aB .5s infinite ease-in-out}
+    `}</style>
+    <g className="df_fig" stroke="currentColor" strokeWidth="7" strokeLinecap="round" fill="none">
+      <circle cx="50" cy="18" r="12" fill="currentColor" stroke="none" />
+      <line x1="50" y1="30" x2="50" y2="88" />
+      <line className="df_aA" x1="50" y1="48" x2="74" y2="66" />
+      <line className="df_aB" x1="50" y1="48" x2="26" y2="66" />
+      <line className="df_lA" x1="50" y1="88" x2="64" y2="130" />
+      <line className="df_lB" x1="50" y1="88" x2="36" y2="130" />
+    </g>
+  </svg>
 );
 const RC = ({ k, v }) => (
   <div className="rounded-xl bg-realm/60 border border-magic/20 p-2.5">
