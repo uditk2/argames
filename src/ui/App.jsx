@@ -11,8 +11,13 @@ import ResultsScreen from './screens/ResultsScreen.jsx';
 import { DEFAULT_DURATION, DEFAULT_BODYWEIGHT_KG } from '../config/game.config.js';
 import { DEFAULT_AVATAR_ID } from '../config/avatars.js';
 import DinoSurvival from '../games/dino-survival/index.js';
+import Home from './screens/Home.jsx';
+import { track } from '../analytics/ga.js';
 import { punchScores, PUNCH_LEVEL } from '../net/gameClients.js';
 import { getName, getCountry, setCountry } from '../net/identity.js';
+
+const HOME_TITLE = 'SlayFit — Move to play · AR fitness games';
+const GAME_TITLE = { dino: 'Dino Survival — SlayFit', demon: 'Monster Punch — SlayFit' };
 
 // Best-effort: on a phone, go fullscreen + lock to a target orientation (Android
 // Chrome). iOS Safari ignores orientation.lock — the RotatePrompt overlay covers
@@ -29,48 +34,21 @@ async function lockOrientation(want) {
 // (no prompt). Dino Survival plays in PORTRAIT (its action is vertical); Monster
 // Punch asks for LANDSCAPE only once its actual gameplay starts (see DemonRealm).
 export default function App() {
-  const [game, setGame] = useState(null); // null = menu | 'demon' | 'dino'
-  const pick = (g) => setGame(g);   // orientation is handled by the native app wrapper, not gated on the web
+  const [game, setGame] = useState(null); // null = home | 'demon' | 'dino'
+  // page title per screen (browser tab + GA page_title)
+  useEffect(() => { document.title = game ? (GAME_TITLE[game] || HOME_TITLE) : HOME_TITLE; }, [game]);
+  const pick = (g) => {
+    // GA: one event per launch tagged with the game id, so the Events report
+    // ranks which game is played most. (Orientation handled by the native wrapper.)
+    track('game_start', { game_id: g, game_name: g === 'dino' ? 'Dino Survival' : 'Monster Punch' });
+    setGame(g);
+  };
   return (
     <>
       {game === 'dino' ? <DinoSurvival onExit={() => setGame(null)} />
         : game === 'demon' ? <DemonRealm />
-        : <GameMenu onPick={pick} />}
+        : <Home onPlay={pick} />}
     </>
-  );
-}
-
-const GAMES = [
-  { id: 'dino', title: 'Dino Survival', tagline: 'Outrun the beast. Reach the jeep.', img: '/assets/dino-survival/bg/trail.png', orientation: 'portrait' },
-  { id: 'demon', title: 'Monster Punch', tagline: 'Punch monsters. Block. Burn.', img: '/assets/backgrounds/Cloudy_Sky-Night_01-1024x512.png', orientation: 'landscape' },
-];
-
-function GameMenu({ onPick }) {
-  return (
-    <div className="w-screen min-h-[100dvh] overflow-y-auto bg-realm text-ink flex flex-col items-center justify-center p-4 sm:p-6">
-      <div className="text-center mb-5 sm:mb-8">
-        <div className="font-display font-black text-3xl sm:text-4xl bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">SLAYFIT</div>
-        <div className="text-[11px] tracking-[0.24em] text-magic/80 mt-1 uppercase">Move to play · pick a game</div>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 w-full max-w-[680px]">
-        {GAMES.map((g) => (
-          <button
-            key={g.id}
-            onClick={() => onPick(g.id)}
-            className="group relative h-[210px] rounded-2xl overflow-hidden border border-magic/30 hover:border-magic/80 shadow-glow hover:shadow-glow-fire transition focus:outline-none focus:border-magic"
-          >
-            <img src={g.img} alt="" className="absolute inset-0 w-full h-full object-cover transition duration-500 group-hover:scale-[1.07]" />
-            <div className="absolute inset-0 bg-gradient-to-t from-[rgba(8,4,16,.95)] via-[rgba(16,8,30,.45)] to-[rgba(16,8,30,.15)]" />
-            <div className="absolute bottom-0 left-0 right-0 p-5 text-left">
-              <div className="font-display font-black text-2xl text-white drop-shadow-[0_2px_8px_rgba(0,0,0,.7)]">{g.title}</div>
-              <div className="text-[12.5px] text-ink/85 mt-1">{g.tagline}</div>
-            </div>
-            <div className="absolute top-3 right-3 text-[10px] font-bold tracking-[0.18em] uppercase text-white/90 bg-black/40 border border-white/20 rounded-full px-2.5 py-1 opacity-0 group-hover:opacity-100 transition">Play ▸</div>
-          </button>
-        ))}
-      </div>
-      <div className="text-[11px] text-magic/50 mt-8">Camera-powered · run &amp; move to play</div>
-    </div>
   );
 }
 
