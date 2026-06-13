@@ -14,44 +14,52 @@ import DinoSurvival from '../games/dino-survival/index.js';
 import { punchScores, PUNCH_LEVEL } from '../net/gameClients.js';
 import { getName, getCountry, setCountry } from '../net/identity.js';
 
-// Best-effort: on a phone, go fullscreen + lock landscape (Android Chrome).
-// iOS Safari ignores orientation.lock — the RotatePrompt overlay covers that.
-async function lockLandscape() {
+// Best-effort: on a phone, go fullscreen + lock to a target orientation (Android
+// Chrome). iOS Safari ignores orientation.lock — the RotatePrompt overlay covers
+// that. `want` is 'landscape' or 'portrait'.
+async function lockOrientation(want) {
   const mobile = Math.min(window.innerWidth, window.innerHeight) < 820;
   if (!mobile) return;
   try { if (document.documentElement.requestFullscreen && !document.fullscreenElement) await document.documentElement.requestFullscreen(); } catch {}
-  try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock('landscape'); } catch {}
+  try { if (screen.orientation && screen.orientation.lock) await screen.orientation.lock(want); } catch {}
 }
 
 // Top-level launcher: pick a game. (Each game is a self-contained module.)
+// Orientation is per-context: the menu + details screens are portrait-friendly
+// (no prompt). Dino Survival plays in PORTRAIT (its action is vertical); Monster
+// Punch asks for LANDSCAPE only once its actual gameplay starts (see DemonRealm).
 export default function App() {
   const [game, setGame] = useState(null); // null = menu | 'demon' | 'dino'
-  const pick = (g) => { lockLandscape(); setGame(g); };  // landscape lock fires on the tap gesture
+  const pick = (g) => { if (g === 'dino') lockOrientation('portrait'); setGame(g); };  // demon locks landscape later, when its round starts
   return (
     <>
-      <RotatePrompt />
-      {game === 'dino' ? <DinoSurvival onExit={() => setGame(null)} />
-        : game === 'demon' ? <DemonRealm />
+      {game === 'dino' ? (
+        <><RotatePrompt want="portrait" /><DinoSurvival onExit={() => setGame(null)} /></>
+      ) : game === 'demon' ? <DemonRealm />
         : <GameMenu onPick={pick} />}
     </>
   );
 }
 
-// Both games are designed for a wide stage — ask mobile players to go landscape.
-function RotatePrompt() {
+// Ask mobile players to rotate to the orientation a screen needs. `want` is the
+// desired orientation; the prompt only shows on small screens that are in the
+// WRONG orientation, and only while `enabled` (so menus/details don't nag).
+function RotatePrompt({ want = 'landscape', enabled = true }) {
   const [show, setShow] = useState(false);
   useEffect(() => {
     const check = () => {
-      const portrait = window.matchMedia('(orientation: portrait)').matches;
+      const isPortrait = window.matchMedia('(orientation: portrait)').matches;
       const small = Math.min(window.innerWidth, window.innerHeight) < 820;
-      setShow(portrait && small);
+      const wrong = want === 'landscape' ? isPortrait : !isPortrait;
+      setShow(enabled && small && wrong);
     };
     check();
     window.addEventListener('resize', check);
     window.addEventListener('orientationchange', check);
     return () => { window.removeEventListener('resize', check); window.removeEventListener('orientationchange', check); };
-  }, []);
+  }, [want, enabled]);
   if (!show) return null;
+  const toPortrait = want === 'portrait';
   return (
     <div className="fixed inset-0 z-[999] bg-realm/95 backdrop-blur-sm flex items-center justify-center p-6 text-center">
       <div className="panel p-8 max-w-[340px]">
@@ -62,15 +70,15 @@ function RotatePrompt() {
           <path d="M48 24v8h-8M16 40v-8h8" />
         </svg>
         <div className="font-display font-black text-xl text-ink">Rotate your device</div>
-        <p className="text-magic/80 text-[13px] mt-2 leading-relaxed">Turn your phone to <b className="text-ink">landscape</b> to play — these games need a wide stage to look and play their best.</p>
+        <p className="text-magic/80 text-[13px] mt-2 leading-relaxed">Turn your phone to <b className="text-ink">{toPortrait ? 'portrait' : 'landscape'}</b> to play — {toPortrait ? 'this game runs in a tall, vertical view.' : 'this game needs a wide stage to look and play its best.'}</p>
       </div>
     </div>
   );
 }
 
 const GAMES = [
-  { id: 'dino', title: 'Dino Survival', tagline: 'Outrun the beast. Reach the jeep.', img: '/assets/dino-survival/bg/trail.png' },
-  { id: 'demon', title: 'Monster Punch', tagline: 'Punch monsters. Block. Burn.', img: '/assets/backgrounds/Cloudy_Sky-Night_01-1024x512.png' },
+  { id: 'dino', title: 'Dino Survival', tagline: 'Outrun the beast. Reach the jeep.', img: '/assets/dino-survival/bg/trail.png', orientation: 'portrait' },
+  { id: 'demon', title: 'Monster Punch', tagline: 'Punch monsters. Block. Burn.', img: '/assets/backgrounds/Cloudy_Sky-Night_01-1024x512.png', orientation: 'landscape' },
 ];
 
 function GameMenu({ onPick }) {
@@ -115,6 +123,7 @@ function DemonRealm() {
   const [board, setBoard] = useState(null); // leaderboard rows from the submit (no extra call)
 
   const startGame = useCallback((chosen) => {
+    lockOrientation('landscape');                 // wide stage for the punch arena — lock on the Start gesture
     setClip(null); setBoard(null);
     setSettings((s) => ({ ...s, ...chosen }));
     setScreen('game');
@@ -149,6 +158,8 @@ function DemonRealm() {
 
   return (
     <div className="w-screen h-screen overflow-hidden bg-realm text-ink">
+      {/* landscape only matters once the punch round is running; details stay portrait-friendly */}
+      <RotatePrompt want="landscape" enabled={screen === 'game'} />
       {screen === 'start' && (
         <StartScreen initial={settings} onStart={startGame} />
       )}
