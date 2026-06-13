@@ -469,7 +469,7 @@ export default function DinoSurvival({ onExit }) {
       {/* INTRO */}
       {!showBoard && (screen === 'intro' || screen === 'loading') && (
         <Center>
-          <div className="font-display font-black text-3xl bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">DINO SURVIVAL</div>
+          <div className="font-display font-black text-2xl sm:text-3xl bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">DINO SURVIVAL</div>
           <div className="text-[11px] tracking-[0.24em] text-magic/80 mt-1 uppercase mb-3">Run · Escape · Survive</div>
           <p className="text-ink/70 text-[13px] leading-relaxed">
             A beast is hunting you through the jungle. <b className="text-ink">Run in place</b> to race down the trail and reach the waiting jeep before it catches you — faster running, faster getaway.
@@ -524,11 +524,11 @@ export default function DinoSurvival({ onExit }) {
       {/* RESULT */}
       {screen === 'result' && result && (
         <Center>
-          <div className="font-display font-black text-3xl">
+          <div className="font-display font-black text-2xl sm:text-3xl">
             <span className={result.escaped ? 'text-gold' : 'text-fire-bright'}>{result.escaped ? 'ESCAPED' : 'CAUGHT'}</span>
           </div>
-          <div className="text-[11px] tracking-[0.24em] text-magic/80 mt-1 uppercase mb-1">{lvl.label}</div>
-          <div className="grid grid-cols-2 gap-2.5 my-4">
+          <div className="text-[11px] tracking-[0.24em] text-magic/80 mt-0.5 uppercase mb-1">{lvl.label}</div>
+          <div className="grid grid-cols-2 gap-2 my-2.5">
             {result.escaped
               ? (<><RC k="Escape time" v={result.timeS.toFixed(1) + 's'} /><RC k="Personal best" v={best.escape != null ? best.escape.toFixed(1) + 's' : '—'} /></>)
               : (<><RC k="Distance reached" v={result.pct + '%'} /><RC k="Survived" v={result.timeS.toFixed(1) + 's'} /></>)}
@@ -590,7 +590,8 @@ const RC = ({ k, v }) => (
   </div>
 );
 const Center = ({ children }) => (
-  <div className="absolute inset-0 z-[20] flex items-center justify-center p-4">
-    <div className="panel p-7 w-[min(94vw,520px)] text-center">{children}</div>
+  <div className="absolute inset-0 z-[20] flex items-center justify-center p-2 sm:p-4">
+    {/* landscape-phone friendly: cap height + scroll so it never overflows a short viewport */}
+    <div className="panel p-3.5 sm:p-6 w-[min(96vw,560px)] max-h-[94dvh] overflow-y-auto text-center">{children}</div>
   </div>
 );
