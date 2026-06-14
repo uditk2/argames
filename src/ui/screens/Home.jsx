@@ -136,7 +136,7 @@ export default function Home({ onPlay }) {
         <div className="ar">
           <div className="arc reveal"><div className="arstage"><div className="cam" /></div><div className="arnum">01</div><h3>The camera sees you</h3><p>Stand in frame. Your webcam streams to an on-device pose model — nothing ever leaves your machine.</p></div>
           <div className="arc reveal"><div className="arstage"><svg className="skel" data-skel viewBox="0 0 300 400" width="120" height="160" preserveAspectRatio="xMidYMid meet" /></div><div className="arnum">02</div><h3>AI maps your skeleton</h3><p>Knees, hips and wrists are tracked thirty times a second — your cadence, stride and guard, live.</p></div>
-          <div className="arc reveal"><div className="arstage"><div className="avwrap"><img src="/assets/sprites/player_idle.png" alt="" /></div></div><div className="arnum">03</div><h3>You become the hero</h3><p>Your movement drives the avatar instantly. Run faster and the world flies by; stop, and so do you.</p></div>
+          <div className="arc reveal"><div className="arstage"><div className="avwrap"><img src="/assets/home/pose-controller.png" alt="A player with the live pose-tracking skeleton on them" /></div></div><div className="arnum">03</div><h3>You become the controller</h3><p>Your movement drives the game instantly — run faster and the world flies by; stop, and so do you.</p></div>
         </div>
       </div></section>
 
@@ -267,8 +267,8 @@ const CSS = `
 .sf-home .cam:before{content:"";position:absolute;width:30px;height:30px;border:2px solid var(--ember);border-radius:50%;left:50%;top:50%;transform:translate(-50%,-50%)}
 .sf-home .cam:after{content:"";position:absolute;left:8px;right:8px;height:2px;background:linear-gradient(90deg,transparent,var(--gold),transparent);animation:sfscan2 2.4s ease-in-out infinite}
 @keyframes sfscan2{0%,100%{top:12px}50%{top:58px}}
-.sf-home .avwrap{position:relative;height:140px}
-.sf-home .avwrap img{height:140px;object-fit:contain;filter:drop-shadow(0 0 22px rgb(var(--magic-rgb)/.45));animation:sfbob 2.2s ease-in-out infinite}
+.sf-home .avwrap{position:relative;height:150px;display:grid;place-items:center}
+.sf-home .avwrap img{height:150px;object-fit:contain;filter:drop-shadow(0 4px 14px rgba(0,0,0,.5));animation:sfbob 2.6s ease-in-out infinite}
 @keyframes sfbob{50%{transform:translateY(-9px)}}
 .sf-home .report{display:grid;grid-template-columns:.85fr 1.15fr;border:1px solid rgb(var(--magic-rgb)/.22);border-radius:24px;overflow:hidden;background:var(--panel);margin-top:34px}
 .sf-home .rleft{padding:36px;background:linear-gradient(180deg,rgb(var(--fire-rgb)/.10),transparent)}
