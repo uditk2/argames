@@ -44,7 +44,7 @@ function Row({ r, rank, metric }) {
   );
 }
 
-export default function Leaderboard({ client, level, label, rows: preloaded = null, limit = 100, compact = false, onClose }) {
+export default function Leaderboard({ client, level, label, rows: preloaded = null, limit = 100, compact = false, showMeta = true, onClose }) {
   const metric = client?.metric || 'time';
   const [rows, setRows] = useState(preloaded || []);
   const [loading, setLoading] = useState(!preloaded);
@@ -69,7 +69,9 @@ export default function Leaderboard({ client, level, label, rows: preloaded = nu
         <div className="font-display font-black text-xl bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">
           {compact ? 'Top Players' : 'Leaderboard'}
         </div>
-        <div className="text-[11px] tracking-[0.18em] uppercase text-magic/80">{label ? `${label} · ${sub}` : sub}</div>
+        {showMeta && (
+          <div className="text-[11px] tracking-[0.18em] uppercase text-magic/80">{label ? `${label} · ${sub}` : sub}</div>
+        )}
       </div>
 
       <div className="rounded-xl bg-realm/50 border border-magic/30 p-1.5">

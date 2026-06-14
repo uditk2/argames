@@ -498,7 +498,7 @@ export default function DinoSurvival({ onExit }) {
       {/* LEADERBOARD overlay (from intro) */}
       {showBoard && screen === 'intro' && (
         <Center>
-          <Leaderboard client={scores} level={level} label={LEVELS[level].label} onClose={() => setShowBoard(false)} />
+          <Leaderboard client={scores} level={level} showMeta={false} onClose={() => setShowBoard(false)} />
         </Center>
       )}
 
@@ -595,7 +595,7 @@ export default function DinoSurvival({ onExit }) {
           {/* Top escapes — preloaded from the submit response, so no extra call. */}
           {board && board.length > 0 && (
             <div className="my-3">
-              <Leaderboard client={scores} level={level} label={lvl.label} rows={board.slice(0, 5)} compact />
+              <Leaderboard client={scores} level={level} rows={board.slice(0, 5)} compact showMeta={false} />
             </div>
           )}
 
