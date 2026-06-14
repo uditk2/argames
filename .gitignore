@@ -5,3 +5,11 @@ dist
 .vercel
 .env
 .env*.local
+
+# Standalone "Grotto" demo build artifacts (see scripts/build-grotto-demo.sh)
+dist-grotto/
+dino-survival-grotto.zip
+dino-survival-media/
+._grotto_*
+grotto_tmp_*
+.trashbin/

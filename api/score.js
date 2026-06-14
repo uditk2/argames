@@ -53,6 +53,33 @@ function edgeCountry(req, bodyCountry = null) {
   return safeStr(bodyCountry, 2)?.toUpperCase() || null;
 }
 
+// Optional community feed: post an escape to a Discord channel via webhook.
+// POST-ONLY by design — the on-site leaderboard stays in Neon and we never read
+// back from Discord (auth/rate-limits/CORS make that fragile). No-op unless
+// DISCORD_WEBHOOK_URL is set; always best-effort so it can't break scoring.
+async function postDiscord(req, { game, level, player, timeS, pct, escaped, isPB, country }) {
+  const url = process.env.DISCORD_WEBHOOK_URL;
+  if (!url || game !== 'dino-survival' || !escaped) return;
+  try {
+    const proto = (req.headers['x-forwarded-proto'] || 'https').split(',')[0];
+    const host = req.headers['x-forwarded-host'] || req.headers.host || '';
+    const params = new URLSearchParams({ g: 'dino', esc: '1', dt: String(Math.round(timeS * 10)), pct: String(pct || 0) });
+    const link = host ? `${proto}://${host}/s?${params.toString()}` : null;
+    const who = (player && player.trim()) || 'A runner';
+    const embed = {
+      title: `${who} escaped the beast in ${timeS.toFixed(1)}s 🦖`,
+      description: `${level}${isPB ? ' · new personal best!' : ''}${country ? ` · ${country}` : ''}`,
+      color: 0xff7a3c,
+      ...(link ? { url: link } : {}),
+    };
+    const body = { username: 'Dino Survival', embeds: [embed], ...(link ? { content: link } : {}) };
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 2500);   // don't let a slow webhook hold the response
+    await fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body), signal: ctrl.signal }).catch(() => {});
+    clearTimeout(t);
+  } catch { /* best-effort: never break score submission */ }
+}
+
 // Best for a game+level, shaped by metric.
 async function bestFor(game, level, metric) {
   if (metric === 'score') {
@@ -190,6 +217,9 @@ export default async function handler(req, res) {
         await sql`
           insert into scores (game, level, escaped, time_s, pct, player, country, client_id)
           values (${g.game}, ${g.level}, ${escaped}, ${timeS}, ${pct}, ${player}, ${country}, ${clientId})`;
+
+        // optional Discord community feed (no-op unless DISCORD_WEBHOOK_URL is set)
+        await postDiscord(req, { game: g.game, level: g.level, player, timeS, pct, escaped, isPB, country });
       }
 
       const [best, leaderboard] = await Promise.all([

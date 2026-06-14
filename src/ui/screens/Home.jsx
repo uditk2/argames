@@ -22,12 +22,14 @@ const X_HANDLE = 'UditKhandelwal8';
 const X_URL = `https://x.com/${X_HANDLE}`;
 const DISCORD_URL = 'https://discord.gg/H5Ufkukv';
 
-export default function Home({ onPlay }) {
+export default function Home({ onPlay, onOpenLeaderboard }) {
   const rootRef = useRef(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const open = () => setPickerOpen(true);
   const close = () => setPickerOpen(false);
   const play = (id) => { close(); onPlay && onPlay(id); };
+  // Real href (crawlable + open-in-new-tab works) but SPA-navigate on click.
+  const goBoard = (e) => { if (e) e.preventDefault(); close(); onOpenLeaderboard && onOpenLeaderboard(); };
 
   // scroll-reveal + the animated run-cycle skeletons (one in the hero, one in
   // the "how it works" step). Imperative SVG build, cleaned up on unmount.
@@ -83,6 +85,7 @@ export default function Home({ onPlay }) {
         <div className="brand">SLAY<b>FIT</b></div>
         <div className="navlinks">
           <a href="#games">Games</a><a href="#mission">Mission</a><a href="#how">How it works</a>
+          <a href="/leaderboard" onClick={goBoard}>Leaderboard</a>
           <button className="btn btn-fire navplay" onClick={open}>Play</button>
         </div>
       </div></nav>
@@ -93,6 +96,7 @@ export default function Home({ onPlay }) {
           <div className="eyebrow">Webcam AR games · no gear, no headset</div>
           <h1 className="disp">Pick your game.<br /><span className="grad">Your body's the controller.</span></h1>
           <p className="lead">No gear, no headset — your webcam reads your movement and drops you inside the game. A real workout you'll forget you're even doing.</p>
+          <div className="herocta"><a className="boardlink" href="/leaderboard" onClick={goBoard}>🏆 See the leaderboard</a></div>
         </div>
         <div className="herogames">
           {GAMES.map((g) => (
@@ -140,6 +144,7 @@ export default function Home({ onPlay }) {
             <a href="#games">Games</a>
             <a href="#mission">Mission</a>
             <a href="#how">How it works</a>
+            <a href="/leaderboard" onClick={goBoard}>Leaderboard</a>
             <a className="social" href={X_URL} target="_blank" rel="noopener noreferrer" aria-label={`Contact on X, @${X_HANDLE}`}>
               <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24h-6.66l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
               <span>@{X_HANDLE}</span>
@@ -206,6 +211,9 @@ const CSS = `
 .sf-home .herohead h1{font-size:clamp(32px,4.6vw,56px);line-height:1.06;letter-spacing:.5px;margin-top:10px}
 .sf-home .herohead .lead{color:#d9d0c1;font-size:clamp(16px,1.6vw,18px);max-width:54ch;margin:14px auto 0}
 .sf-home .hero .cta{display:flex;gap:12px;margin-top:26px;justify-content:center;flex-wrap:wrap}
+.sf-home .herocta{margin-top:18px;display:flex;justify-content:center}
+.sf-home .boardlink{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--gold);padding:9px 18px;border-radius:999px;border:1px solid rgb(var(--magic-rgb)/.4);transition:.2s}
+.sf-home .boardlink:hover{color:var(--ink);border-color:var(--gold);background:rgb(var(--magic-rgb)/.08)}
 .sf-home .herogames{display:grid;grid-template-columns:1fr 1fr;gap:24px}
 .sf-home .hgcard{position:relative;min-height:clamp(240px,40vh,440px);border-radius:26px;overflow:hidden;border:1px solid rgb(var(--magic-rgb)/.22);cursor:pointer;text-align:left;padding:0;background:none;color:inherit;font:inherit;transition:.25s}
 .sf-home .hgcard:hover{transform:translateY(-5px);border-color:var(--gold);box-shadow:0 30px 72px rgb(var(--fire-rgb)/.26)}

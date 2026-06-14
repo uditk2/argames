@@ -12,14 +12,14 @@ import { createSurvival } from '../engine/survival.js';
 import { createScene } from '../render/scene.js';
 import { loadAssets } from '../render/assets.js';
 import { createAudio } from '../audio/sfx.js';
-import { clamp } from '../util.js';
+import { clamp, vis, mid } from '../util.js';
 import { createReplayBuffer } from '../../../recording/replayBuffer.js';
 // Best-score persistence lives behind one module: instant localStorage cache +
 // best-effort sync through /api/score (Neon). See src/net/scores.js.
 import { dinoScores as scores } from '../../../net/gameClients.js';
 import { getName, setName, getCountry, setCountry as persistCountry, flagEmoji } from '../../../net/identity.js';
 import Leaderboard from '../../../ui/Leaderboard.jsx';
-import { shareFile } from '../../../sharing/share.js';
+import { shareFile, downloadBlob } from '../../../sharing/share.js';
 import { openSocialShare, copyShareLink, shareText } from '../../../sharing/socialShare.js';
 
 // phone vs desktop — only phones "hold the device away"; desktops "move back".
@@ -30,6 +30,10 @@ export default function DinoSurvival({ onExit }) {
   const assetsRef = useRef(null);   // cache loaded images across runs (avoid re-decoding ~50MB every game)
   const sfxRef = useRef(null);      // procedural Web Audio engine (reused across runs)
   const [audioMuted, setAudioMuted] = useState(() => { try { return localStorage.getItem('slayfit_dino_muted') === '1'; } catch { return false; } });
+  const [camMode, setCamMode] = useState(false);         // true while a camera (not demo) run is live — drives the self-view
+  // bodyweight (kg) for the calorie estimate — persisted on the device, default 70
+  const [weight, setWeightState] = useState(() => { try { const w = parseFloat(localStorage.getItem('slayfit_dino_weight')); return Number.isFinite(w) && w > 0 ? w : 70; } catch { return 70; } });
+  const setWeight = (w) => { setWeightState(w); try { if (Number.isFinite(w) && w > 0) localStorage.setItem('slayfit_dino_weight', String(w)); } catch {} };
   const [screen, setScreen] = useState('intro');         // intro | loading | playing | result
   const [level] = useState(DEFAULT_LEVEL);   // single difficulty (Impossible)
   const [hud, setHud] = useState({ t: 0, pace: 0, spm: 0, distPct: 0 });
@@ -83,7 +87,7 @@ export default function DinoSurvival({ onExit }) {
   }, [level]);
 
   async function startGame(mode) {
-    teardown(); setScreen('loading'); setNote(''); setResult(null); setClip(null);
+    teardown(); setScreen('loading'); setNote(''); setResult(null); setClip(null); setCamMode(mode === 'camera');
     // load assets ONCE and reuse across runs (re-decoding ~97 images each game was
     // churning ~50MB of bitmaps — a likely cause of cross-run memory pressure).
     if (!assetsRef.current) assetsRef.current = await loadAssets();
@@ -93,7 +97,8 @@ export default function DinoSurvival({ onExit }) {
     const det = createRunDetector(), surv = createSurvival(LEVELS[level]), scene = createScene(assets), runner = createRunner(assets, RUNNER_IDLE_FRAME);
     let phase = mode === 'camera' ? 'calibrating' : 'countdown';
     let countTo = 0, calStart = 0, lastT = performance.now(), camNear = 0, bgPos = 0, runnerPos = 0, escDone = false;
-    let spmSum = 0, spmSqSum = 0, spmCnt = 0, spmMax = 0, activeMs = 0, calAccum = 0; const WEIGHT_KG = 70;  // for analytics (avg/peak cadence, consistency, calories)
+    let spmSum = 0, spmSqSum = 0, spmCnt = 0, spmMax = 0, activeMs = 0, calAccum = 0;
+    const WEIGHT_KG = (Number.isFinite(weight) && weight > 0) ? weight : 70;  // weight from the intro drives the kcal estimate (fallback 70kg)
     let frameCnt = 0, tAcc = 0;   // for the downloadable telemetry trace (diagnosing detection failures)
     let latestLM = null, latestVid = null, latestMask = null, pm = null, pace = 0, spm = 0, buildTick = 0;
 
@@ -166,6 +171,9 @@ export default function DinoSurvival({ onExit }) {
       replay.start({ video: mode === 'camera' ? videoRef.current : null, pixiCanvas: cv, demoBg: mode === 'demo' ? true : null, webcamInset: true }); } catch { g.replay = null; }
 
     surv.reset();
+    // camera runs open in calibration with the live self-view; demo runs skip straight to the countdown
+    if (mode === 'camera') setCalib({ msg: 'Step into frame', sub: IS_PHONE ? 'set your phone further back so your whole body shows' : 'move back so your whole body shows', ok: false });
+    else setCalib(null);
     setScreen('playing');
     sfx.resume(); sfx.stopAll();   // (jungle ambience bed removed per feedback)
     // lazy-load: start buffering the catch/escape clips now (a run lasts several
@@ -246,9 +254,9 @@ export default function DinoSurvival({ onExit }) {
       scene.endCamera(ctx);
       // speed lines stream in screen space, on top of the moving frame (top-speed accent).
       if (phase !== 'escaped' && phase !== 'calibrating') scene.drawSpeedLines(ctx, W, H, pace, now);
-      // CALIBRATION: lightly dim the scene; the small animated runner figure in the
-      // calib panel is the cue (green when your whole body is in frame).
-      if (phase === 'calibrating') { ctx.fillStyle = 'rgba(7,6,15,0.5)'; ctx.fillRect(0, 0, W, H); }
+      // CALIBRATION: dim the scene, then draw the guided self-view inset (live
+      // webcam + pose skeleton + directional coaching superimposed).
+      if (phase === 'calibrating') { ctx.fillStyle = 'rgba(7,6,15,0.55)'; ctx.fillRect(0, 0, W, H); drawCalibInset(ctx, W, H); }
 
       hudAcc += dt; if (hudAcc > 100) { hudAcc = 0; setHud({ t: snap.t, pace, spm, distPct: snap.distPct }); setKeepRun(keepRunWarn);
         if (g.debug) { const gr = scene.getGround(); const nF = (assets.bgLoop && assets.bgLoop.length) || 1;
@@ -285,6 +293,8 @@ export default function DinoSurvival({ onExit }) {
       sfx.stopLoop('run'); sfx.stopLoop('music'); sfx.play('engine', 0.75, 1.0);     // jeep turns over
       g.audioTimers.push(setTimeout(() => sfx.play('door', 0.85), 1100));            // door shuts
       g.audioTimers.push(setTimeout(() => sfx.play('engine', 0.95, 1.12), 2300));    // peel-off
+      // record the cutscene INTO the clip (it plays as a DOM video the canvas can't see)
+      try { g.replay && g.replay.setMode('cutscene', { video: escapeVideoRef.current }); } catch {}
       playCutscene(escapeVideoRef.current, 'escaped', 5400);   // clip ~4.83s
     }
 
@@ -293,6 +303,8 @@ export default function DinoSurvival({ onExit }) {
       sfx.stopLoop('run'); sfx.stopLoop('music');
       sfx.play('roar', 1.0, 0.95); sfx.play('footfall', 0.9, 0.8);                   // lunge
       g.audioTimers.push(setTimeout(() => sfx.play('chomp', 1.0), 500));             // the bite — "consuming"
+      // record the cutscene INTO the clip (it plays as a DOM video the canvas can't see)
+      try { g.replay && g.replay.setMode('cutscene', { video: caughtVideoRef.current }); } catch {}
       playCutscene(caughtVideoRef.current, 'caught', 3600);   // catch clip ~3.1s (from f9: lunge -> grab -> bite)
     }
 
@@ -316,8 +328,16 @@ export default function DinoSurvival({ onExit }) {
       // getLastClip is async (rebases MP4 timestamps so the clip starts at 0, no
       // dead lead-in); collect it, then update state.
       (async () => {
-        let cl = null;
-        try { if (G.current.replay) { cl = await G.current.replay.getLastClip(); G.current.replay.stop(); } } catch {}
+        const rep = G.current.replay; let cl = null;
+        try {
+          if (rep) {
+            // close the clip on a branded score card (~1.6s) so a looping share
+            // always ends on the result + brand, then grab the last window.
+            rep.setMode('card', { card: { escaped: !!r.escaped, primary: r.escaped ? r.timeS.toFixed(1) + 's' : r.pct + '%' } });
+            await new Promise((res) => setTimeout(res, 1600));
+            cl = await rep.getLastClip(); rep.stop();
+          }
+        } catch {}
         setClip(cl || null); G.current.clipUrl = cl ? cl.url : null;   // tracked so we can revoke it next run (off-heap blob leak)
       })();
       // ---- run analytics ----
@@ -331,6 +351,84 @@ export default function DinoSurvival({ onExit }) {
         steps: st.steps, cals: Math.round(calAccum), activeS: Math.round(activeMs / 1000),
       });
       phase = 'done'; setScreen('result');
+    }
+
+    // ---- GUIDED CALIBRATION INSET --------------------------------------------
+    // Draws the live webcam + pose skeleton (the "rig") + directional coaching,
+    // all superimposed in one card, so first-time users can see what's detected
+    // and how to position themselves. Reads latestLM / latestVid from the loop.
+    function roundRect(c, x, y, w, h, r) {
+      c.beginPath(); c.moveTo(x + r, y);
+      c.arcTo(x + w, y, x + w, y + h, r); c.arcTo(x + w, y + h, x, y + h, r);
+      c.arcTo(x, y + h, x, y, r); c.arcTo(x, y, x + w, y, r); c.closePath();
+    }
+    function drawSkeleton(c, lm, map, col) {
+      const bones = [[11, 12], [11, 23], [12, 24], [23, 24], [11, 13], [13, 15], [12, 14], [14, 16], [23, 25], [25, 27], [24, 26], [26, 28]];
+      c.save(); c.lineWidth = 3; c.strokeStyle = col; c.lineCap = 'round';
+      c.shadowColor = 'rgba(0,0,0,.65)'; c.shadowBlur = 4;
+      for (const [a, b] of bones) {
+        const pa = map(lm[a]), pb = map(lm[b]);
+        if (pa && pb && pa.v && pb.v) { c.beginPath(); c.moveTo(pa.x, pa.y); c.lineTo(pb.x, pb.y); c.stroke(); }
+      }
+      c.fillStyle = col;
+      for (const i of [11, 12, 13, 14, 15, 16, 23, 24, 25, 26, 27, 28]) {
+        const p = map(lm[i]); if (p && p.v) { c.beginPath(); c.arc(p.x, p.y, 4.2, 0, 7); c.fill(); }
+      }
+      c.restore();
+    }
+    function drawCalibInset(c, W, H) {
+      const lm = latestLM, vidEl = latestVid;
+      const bw = Math.min(W * 0.72, 300), bh = bw * 4 / 3;
+      const bx = (W - bw) / 2, by = H * 0.42 - bh / 2, r = 18;
+
+      // --- directional coaching from the landmarks -------------------------
+      const hip = lm ? mid(lm[23], lm[24]) : null;
+      const hipsV = lm && vis(lm[23]) && vis(lm[24]);
+      const kneesV = lm && vis(lm[25]) && vis(lm[26]);
+      const anklesV = lm && vis(lm[27]) && vis(lm[28]);
+      const ankY = (lm && (lm[27] || lm[28])) ? Math.max((lm[27] || {}).y ?? 0, (lm[28] || {}).y ?? 0) : 1;
+      const headY = lm && lm[0] ? lm[0].y : 0;
+      const span = (lm && lm[0] && (anklesV)) ? Math.abs(ankY - headY) : 0;   // head→foot extent ≈ how close you are
+      let big = 'Stand in frame', sub = 'let the camera see you', state = 'bad';
+      if (lm && hip) {
+        if (!hipsV) { big = 'Step back'; sub = 'move back so your hips show'; }
+        else if (!kneesV || !anklesV || ankY > 0.985) { big = 'Step back'; sub = 'get your knees & feet in frame'; }
+        else if (span > 0 && span < 0.55) { big = 'Step closer'; sub = 'come nearer so we can read your stride'; }
+        else if (hip.x < 0.36) { big = 'Move right →'; sub = 'center yourself in the frame'; state = 'warn'; }
+        else if (hip.x > 0.64) { big = '← Move left'; sub = 'center yourself in the frame'; state = 'warn'; }
+        else { big = 'Run in place'; sub = 'pump your knees to start'; state = 'good'; }
+        if (state === 'bad') state = 'warn';   // we see you, just reposition
+      }
+      const col = state === 'good' ? '#36ef76' : state === 'warn' ? '#ffb627' : '#ff6b8a';
+
+      // --- webcam (mirrored, object-cover, clipped to the card) ------------
+      c.save(); roundRect(c, bx, by, bw, bh, r); c.clip();
+      c.fillStyle = '#0a0510'; c.fillRect(bx, by, bw, bh);
+      let map = () => null;
+      if (vidEl && vidEl.readyState >= 2 && vidEl.videoWidth) {
+        const vw = vidEl.videoWidth, vh = vidEl.videoHeight;
+        const s = Math.max(bw / vw, bh / vh), rw = vw * s, rh = vh * s;
+        const ox = bx + (bw - rw) / 2, oy = by + (bh - rh) / 2;
+        c.save(); c.translate(bx + bw, by); c.scale(-1, 1);
+        c.drawImage(vidEl, (bw - rw) / 2, (bh - rh) / 2, rw, rh); c.restore();
+        // landmarks are already mirrored to match the displayed (mirrored) frame
+        map = (p) => p ? { x: ox + p.x * rw, y: oy + p.y * rh, v: vis(p) } : null;
+      }
+      if (lm) drawSkeleton(c, lm, map, col);
+      // bottom scrim + coaching text, superimposed in the card
+      const grd = c.createLinearGradient(0, by + bh - 66, 0, by + bh);
+      grd.addColorStop(0, 'rgba(7,6,15,0)'); grd.addColorStop(1, 'rgba(7,6,15,.9)');
+      c.fillStyle = grd; c.fillRect(bx, by + bh - 66, bw, 66);
+      c.textAlign = 'center';
+      c.fillStyle = state === 'good' ? '#7dffa0' : '#fff'; c.font = '800 22px system-ui';
+      c.fillText(big, bx + bw / 2, by + bh - 30);
+      c.fillStyle = 'rgba(255,255,255,.82)'; c.font = '600 12px system-ui';
+      c.fillText(sub, bx + bw / 2, by + bh - 13);
+      c.restore();
+
+      // --- card border (colour = how good your framing is) ----------------
+      c.save(); roundRect(c, bx, by, bw, bh, r); c.lineWidth = 3; c.strokeStyle = col;
+      c.shadowColor = 'rgba(0,0,0,.5)'; c.shadowBlur = 16; c.stroke(); c.restore();
     }
 
     g.raf = requestAnimationFrame(loop);
@@ -389,6 +487,14 @@ export default function DinoSurvival({ onExit }) {
     try { const res = await shareFile({ blob: clip.blob, filename: `slayfit-dino-survival.${ext}`, title: 'My Dino Survival run', text: shareText(dinoStats()) }); setShareNote(noteMethod(res.method)); }
     catch { setShareNote('Could not share the clip.'); }
   }
+  // Download the 10s replay clip directly. Desktop browsers can't use the Web
+  // Share files sheet, so an explicit download is the reliable path there.
+  function downloadClip() {
+    if (!clip || !clip.blob) return;
+    const ext = ((clip.mime || clip.blob.type || '').includes('mp4')) ? 'mp4' : 'webm';
+    const ok = downloadBlob(clip.blob, `slayfit-dino-survival.${ext}`);
+    setShareNote(ok ? 'Clip downloaded.' : 'Could not download the clip.');
+  }
   // Post to a social network — opens the /s page whose OG preview is the dino card.
   function onSocial(network, label) { const ok = openSocialShare(network, dinoStats()); setShareNote(ok ? `Opening ${label}…` : `Couldn't open ${label}.`); }
   async function onCopyLink() { const ok = await copyShareLink(dinoStats()); setShareNote(ok ? 'Share link copied!' : "Couldn't copy the link."); }
@@ -408,7 +514,13 @@ export default function DinoSurvival({ onExit }) {
       {/* ambient (shown on intro; the live scene covers it during play) */}
       <img src="/assets/dino-survival/bg/trail.png" alt="" className="absolute inset-0 w-full h-full object-cover" />
       <div className="absolute inset-0 bg-gradient-to-b from-[rgb(var(--realm-rgb)/.45)] via-[rgb(var(--realm-rgb)/.78)] to-[rgb(var(--realm-rgb)/.96)]" />
-      <video ref={videoRef} playsInline muted className="absolute -left-[9999px] -top-[9999px]" />
+      {/* Live self-view. During calibration we draw a richer inset ON THE CANVAS
+          (webcam + pose skeleton + coaching superimposed), so this DOM element is
+          parked then. During the run it becomes a small corner picture-in-picture.
+          It stays mounted throughout so MediaPipe keeps reading the same <video>. */}
+      <video ref={videoRef} playsInline muted autoPlay
+        className="absolute z-[6] object-cover bg-black pointer-events-none"
+        style={selfViewStyle(camMode && screen === 'playing' && !calib ? 'run' : 'hidden')} />
       {/* caught cutscene: dino capture sting — fades in over the cut, and stays frozen
           on its last frame as the result backdrop when you were caught. */}
       <video ref={caughtVideoRef} src="/assets/dino-survival/cut/caught.mp4" playsInline muted preload="none"
@@ -483,15 +595,8 @@ export default function DinoSurvival({ onExit }) {
               Keep running! 🦖
             </div>
           )}
-          {calib && (
-            <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 text-center z-[6]">
-              <div className="panel px-6 py-4">
-                <RunnerFigure ready={calib.ok} />
-                <div className={`text-lg md:text-xl font-extrabold mt-1 ${calib.ok ? 'text-emerald-300' : 'text-ink'}`}>{calib.msg}</div>
-                <div className={`text-xs md:text-sm mt-0.5 ${calib.ok ? 'text-emerald-300/80' : 'text-magic/70'}`}>{calib.sub}</div>
-              </div>
-            </div>
-          )}
+          {/* Calibration coaching (skeleton + directional cues) is drawn directly on
+              the canvas inset in the render loop — see drawCalibInset. */}
         </>
       )}
 
@@ -510,6 +615,11 @@ export default function DinoSurvival({ onExit }) {
           <p className="text-ink/70 text-[13px] leading-relaxed">
             A beast is hunting you through the jungle. <b className="text-ink">Run in place</b> to race down the trail and reach the waiting jeep before it catches you — faster running, faster getaway.
           </p>
+          {/* Animated "how to run" demo — shows the run-in-place motion before you start. */}
+          <div className="my-3 flex flex-col items-center">
+            <RunnerFigure ready size="w-16 h-24" />
+            <div className="text-[11px] tracking-[0.18em] uppercase text-magic/70 mt-1">Run in place · pump your knees</div>
+          </div>
           <ol className="text-left text-ink/80 text-[13px] leading-7 my-3 mx-auto max-w-[420px] list-decimal pl-5 marker:text-magic">
             <li>Stand back so your <b className="text-ink">hips, knees and feet</b> are in frame.</li>
             <li>Tilt your screen ~15° down so your legs stay visible.</li>
@@ -534,9 +644,22 @@ export default function DinoSurvival({ onExit }) {
                 {country ? flagEmoji(country) : '🌐'}
               </span>
             </div>
+            {/* Bodyweight powers the calorie estimate — kept on this device. */}
+            <div className="relative w-24">
+              <input
+                type="number" inputMode="numeric" min="20" max="300"
+                value={weight}
+                onChange={(e) => setWeightState(e.target.value === '' ? '' : Math.max(0, parseFloat(e.target.value) || 0))}
+                onBlur={(e) => { const w = parseFloat(e.target.value); setWeight(Number.isFinite(w) && w > 0 ? w : 70); }}
+                placeholder="70"
+                aria-label="Body weight in kilograms"
+                className="w-full py-2.5 pl-3 pr-8 rounded-xl bg-realm/50 border border-magic/30 text-ink placeholder:text-ink/40 focus:border-magic focus:outline-none focus:shadow-glow transition"
+              />
+              <span className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-magic/60">kg</span>
+            </div>
           </div>
           <p className="text-[11px] text-magic/60 mt-1.5 mb-1">
-            {country ? <>Running for {flagEmoji(country)} {country} · saved on this device</> : 'Detecting your realm…'}
+            {country ? <>Running for {flagEmoji(country)} {country} · saved on this device</> : 'Detecting your realm…'} · weight powers your calorie estimate
           </p>
 
           <div className="mb-4" />
@@ -599,9 +722,19 @@ export default function DinoSurvival({ onExit }) {
             </div>
           )}
 
+          {/* Replay clip — plays inline so you can see your run before sharing it. */}
+          {clip && clip.url && (
+            <div className="my-3">
+              <video src={clip.url} autoPlay loop muted playsInline controls
+                className="mx-auto rounded-xl border border-magic/30 max-h-[38vh] w-auto bg-black" />
+              <p className="text-[11px] text-magic/60 mt-1">Your last 10 seconds — share or download it below</p>
+            </div>
+          )}
+
           <div className="flex gap-2 justify-center flex-wrap mt-1.5">
             <button onClick={() => startGame(G.current.mode || 'camera')} className="px-5 py-2.5 rounded-xl font-bold text-white bg-gradient-to-r from-fire to-magic shadow-glow-fire hover:brightness-110 transition">Run again</button>
             <button onClick={shareClip} disabled={!clip || !clip.blob} className="px-4 py-2.5 rounded-xl font-semibold text-ink/90 bg-realm/50 border border-magic/30 hover:border-magic/60 transition disabled:opacity-40">Share clip</button>
+            <button onClick={downloadClip} disabled={!clip || !clip.blob} className="px-4 py-2.5 rounded-xl font-semibold text-ink/90 bg-realm/50 border border-magic/30 hover:border-magic/60 transition disabled:opacity-40">Download clip</button>
             <button onClick={shareCard} className="px-4 py-2.5 rounded-xl font-semibold text-ink/90 bg-realm/50 border border-magic/30 hover:border-magic/60 transition">Share image</button>
             {onExit && <button onClick={onExit} className="px-4 py-2.5 rounded-xl font-semibold text-ink/80 bg-realm/50 border border-magic/30 hover:border-magic/60 transition">← Back</button>}
             <button onClick={downloadTelemetry} title="download run telemetry (debug)" className="px-3 py-2.5 rounded-xl font-semibold text-ink/50 bg-realm/40 border border-magic/20 hover:border-magic/50 transition text-xs">⬇ telemetry</button>
@@ -624,6 +757,19 @@ export default function DinoSurvival({ onExit }) {
   );
 }
 
+// Self-view geometry. 'run' = small bottom-left PiP during the run; 'hidden' =
+// parked off-screen (element stays mounted so MediaPipe keeps the same <video>
+// source). Calibration draws its own richer inset on the canvas (drawCalibInset).
+// Mirrored (selfie) to match the mirrored landmarks.
+function selfViewStyle(mode) {
+  if (mode === 'run') {
+    return { left: '14px', bottom: '92px', transform: 'scaleX(-1)',
+      width: 'min(32vw, 132px)', aspectRatio: '3 / 4', borderRadius: '12px',
+      border: '2px solid rgba(160,107,255,.85)', boxShadow: '0 6px 22px rgba(0,0,0,.5)', opacity: 0.94 };
+  }
+  return { left: '-9999px', top: '-9999px', width: '2px', height: '2px', opacity: 0 };
+}
+
 const Stat = ({ v, k }) => (
   <div className="panel px-3 py-2 min-w-[74px] text-center">
     <div className="font-black text-xl leading-none text-ink">{v}</div>
@@ -633,8 +779,8 @@ const Stat = ({ v, k }) => (
 
 // Small "run in place" stick-figure for calibration — always animates the run so
 // it demos what to do, and turns GREEN once your whole body is in frame.
-const RunnerFigure = ({ ready }) => (
-  <svg viewBox="0 0 100 150" className="w-14 h-20 mx-auto" style={{ color: ready ? '#36ef76' : '#cdb3ff' }} aria-hidden="true">
+const RunnerFigure = ({ ready, size = 'w-14 h-20' }) => (
+  <svg viewBox="0 0 100 150" className={`${size} mx-auto`} style={{ color: ready ? '#36ef76' : '#cdb3ff' }} aria-hidden="true">
     <style>{`
       @keyframes df_bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
       @keyframes df_lA{0%,100%{transform:rotate(26deg)}50%{transform:rotate(-26deg)}}

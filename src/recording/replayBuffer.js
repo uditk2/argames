@@ -189,6 +189,24 @@ export function createReplayBuffer(opts = {}) {
   // the live game never shows it). Used by games whose canvas is opaque (Dino).
   let webcamInsetMode = false;
 
+  // What the compositor draws each frame:
+  //   'live'     — the game (canvas [+ webcam], the default during a run)
+  //   'cutscene' — a fullscreen ending video (the dino chomp / jeep escape), which
+  //                plays as a DOM <video> the canvas never shows, so we draw it here
+  //                so the CLIP actually contains the payoff (not a frozen trail).
+  //   'card'     — a branded outcome card drawn for the last ~1.5s, so a looping
+  //                clip always closes on the result + brand.
+  let drawMode = 'live';
+  let cutsceneVideo = null;   // <video> drawn fullscreen in 'cutscene' mode
+  let endCard = null;         // { escaped, primary } drawn in 'card' mode
+
+  /** Switch what the recorder composites. See drawMode above. */
+  function setMode(m, opts = {}) {
+    drawMode = m || 'live';
+    if (m === 'cutscene') cutsceneVideo = opts.video || null;
+    if (m === 'card') endCard = opts.card || null;
+  }
+
   /** Whether instant-replay capture is available in this browser. */
   const isSupported = support.ok;
 
@@ -208,6 +226,7 @@ export function createReplayBuffer(opts = {}) {
       videoEl = video || null;
       pixiCanvas = canvas;
       webcamInsetMode = !!webcamInset;
+      drawMode = 'live'; cutsceneVideo = null; endCard = null;   // fresh per run
 
       // Size the compositor to the Pixi canvas (the on-screen drawing size).
       const w = canvas.width || 720;
@@ -273,6 +292,18 @@ export function createReplayBuffer(opts = {}) {
     ctx.fillRect(0, 0, w, h);
     ctx.restore();
 
+    // Ending overlays (Dino): the cutscene + outcome card so the clip has a real
+    // finish instead of a frozen, character-less trail frame.
+    if (drawMode === 'card' && endCard) { drawEndCard(ctx, w, h, endCard); return; }
+    if (drawMode === 'cutscene') {
+      const v = cutsceneVideo;
+      if (v && v.readyState >= 2 && v.videoWidth > 0) {
+        drawCover(ctx, v, v.videoWidth, v.videoHeight, w, h, false);   // cutscene is already correctly oriented — no mirror
+        return;
+      }
+      // not ready yet → fall through and keep showing the frozen scene
+    }
+
     if (webcamInsetMode) {
       // Opaque scene first, then a small webcam picture-in-picture near the avatar
       // (clip-only — never shown live). Demo / no-camera just records the scene.
@@ -303,6 +334,31 @@ export function createReplayBuffer(opts = {}) {
         /* canvas may be transiently untainted/empty; skip this frame */
       }
     }
+  }
+
+  /** Branded outcome card drawn as the final frames so a looping clip closes on
+   *  the result + brand (works in both landscape and portrait — text scales to h). */
+  function drawEndCard(c, w, h, card) {
+    c.save();
+    c.fillStyle = '#0c0a1f';
+    c.fillRect(0, 0, w, h);
+    // soft warm glow from the bottom (matches the share card / brand)
+    const g = c.createRadialGradient(w / 2, h * 1.05, h * 0.1, w / 2, h * 1.05, h * 0.95);
+    g.addColorStop(0, 'rgba(255,122,60,0.30)');
+    g.addColorStop(1, 'rgba(12,10,31,0)');
+    c.fillStyle = g; c.fillRect(0, 0, w, h);
+    c.textAlign = 'center';
+    const cx = w / 2;
+    c.fillStyle = '#a06bff'; c.font = `900 ${Math.round(h * 0.05)}px system-ui`;
+    c.fillText('DINO SURVIVAL', cx, h * 0.30);
+    c.fillStyle = card.escaped ? '#7dffa0' : '#ff6b8a';
+    c.font = `900 ${Math.round(h * 0.12)}px system-ui`;
+    c.fillText(card.escaped ? 'ESCAPED' : 'CAUGHT', cx, h * 0.50);
+    c.fillStyle = '#ffffff'; c.font = `900 ${Math.round(h * 0.17)}px system-ui`;
+    c.fillText(String(card.primary || ''), cx, h * 0.70);
+    c.fillStyle = '#ff7a3c'; c.font = `800 ${Math.round(h * 0.042)}px system-ui`;
+    c.fillText('outrun the beast · slayfit', cx, h * 0.84);
+    c.restore();
   }
 
   /** Rounded-rectangle path on a 2D context. */
@@ -442,5 +498,5 @@ export function createReplayBuffer(opts = {}) {
     return { blob, url, mime: type, durationSec };
   }
 
-  return { start, stop, getLastClip, isSupported };
+  return { start, stop, getLastClip, isSupported, setMode };
 }

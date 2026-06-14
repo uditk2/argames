@@ -12,6 +12,7 @@ import { DEFAULT_DURATION, DEFAULT_BODYWEIGHT_KG } from '../config/game.config.j
 import { DEFAULT_AVATAR_ID } from '../config/avatars.js';
 import DinoSurvival from '../games/dino-survival/index.js';
 import Home from './screens/Home.jsx';
+import LeaderboardPage from './screens/LeaderboardPage.jsx';
 import { track } from '../analytics/ga.js';
 import { punchScores, PUNCH_LEVEL } from '../net/gameClients.js';
 import { getName, getCountry, setCountry } from '../net/identity.js';
@@ -32,44 +33,51 @@ async function lockOrientation(want) {
 // (no prompt). Dino Survival plays in PORTRAIT (its action is vertical); Monster
 // Punch asks for LANDSCAPE only once its actual gameplay starts (see DemonRealm).
 export default function App() {
-  // Game state is derived from (and synced to) the URL so each game has its own
-  // shareable, indexable address: / = home, /brawler = 'demon', /dino-survival = 'dino'.
-  const [game, setGame] = useState(
-    () => routeForPath(typeof window !== 'undefined' ? window.location.pathname : '/').game
+  // The whole route (not just the game id) is derived from + synced to the URL,
+  // so every screen has a shareable, indexable address: / = home, /brawler =
+  // 'demon', /dino-survival = 'dino', /leaderboard = the standalone board page.
+  // Tracking the full route (not only `game`) lets two game:null pages — home
+  // and /leaderboard — be told apart.
+  const [route, setRoute] = useState(
+    () => routeForPath(typeof window !== 'undefined' ? window.location.pathname : '/')
   );
 
   // Keep the <head> (title, description, canonical, OG) in sync with the route.
-  useEffect(() => { applyRouteHead(routeForGame(game)); }, [game]);
+  useEffect(() => { applyRouteHead(route); }, [route]);
 
-  // Back/forward buttons: re-derive the game from the URL.
+  // Back/forward buttons: re-derive the route from the URL.
   useEffect(() => {
-    const onPop = () => setGame(routeForPath(window.location.pathname).game);
+    const onPop = () => setRoute(routeForPath(window.location.pathname));
     window.addEventListener('popstate', onPop);
     return () => window.removeEventListener('popstate', onPop);
   }, []);
 
-  // Navigate: push the route's URL (so refresh/share/back all work) then switch game.
-  const navigate = useCallback((g) => {
-    const r = routeForGame(g);
-    if (typeof window !== 'undefined' && window.location.pathname !== r.path) {
-      window.history.pushState({}, '', r.path);
+  // Navigate to a path: push it (so refresh/share/back all work) then re-route.
+  const go = useCallback((path) => {
+    if (typeof window !== 'undefined' && window.location.pathname !== path) {
+      window.history.pushState({}, '', path);
     }
-    setGame(g);
+    setRoute(routeForPath(path));
   }, []);
 
   const pick = (g) => {
     // GA: one event per launch tagged with the game id, so the Events report
     // ranks which game is played most. (Orientation handled by the native wrapper.)
     track('game_start', { game_id: g, game_name: g === 'dino' ? 'Dino Survival' : 'Monster Punch' });
-    navigate(g);
+    go(routeForGame(g).path);
   };
-  const goHome = () => navigate(null);
+  const goHome = () => go('/');
+  const openLeaderboard = () => go('/leaderboard');
+
+  if (route.view === 'leaderboard') {
+    return <LeaderboardPage onExit={goHome} onPlay={pick} />;
+  }
 
   return (
     <>
-      {game === 'dino' ? <DinoSurvival onExit={goHome} />
-        : game === 'demon' ? <DemonRealm />
-        : <Home onPlay={pick} />}
+      {route.game === 'dino' ? <DinoSurvival onExit={goHome} />
+        : route.game === 'demon' ? <DemonRealm />
+        : <Home onPlay={pick} onOpenLeaderboard={openLeaderboard} />}
     </>
   );
 }

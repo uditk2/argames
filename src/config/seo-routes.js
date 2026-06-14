@@ -6,6 +6,8 @@
 //   • buildtime(scripts/prerender-...) — writes a static HTML file per route
 //
 // `game` is App's internal game id: null = home | 'demon' (Monster Punch) | 'dino'.
+// `view` marks non-game pages that still own a URL (e.g. the standalone
+// leaderboards page). Home is the only game:null route WITHOUT a view.
 // Keep paths in sync with the App router and vercel.json.
 // ===========================================================================
 
@@ -59,6 +61,24 @@ export const ROUTES = [
         <h2>How to play</h2>
         <p>Allow camera access, stand back so your body is in frame, and run in place. Pose tracking turns your stride, jumps and ducks into controls. No camera? Use demo mode.</p>
         <p>Part of <a href="/">SlayFit fitness AR games</a> · also try <a href="/brawler">Monster Punch</a>.</p>
+      </main>`,
+  },
+  {
+    path: '/leaderboard',
+    game: null,
+    view: 'leaderboard',
+    title: 'Leaderboard — Top SlayFit Players | SlayFit',
+    description:
+      'See who tops the SlayFit leaderboards. The fastest Dino Survival escape times and the highest Monster Punch scores from players around the world. Beat them with your webcam — no equipment, no download.',
+    body: `<main>
+        <h1>SlayFit Leaderboards</h1>
+        <p>See who tops the SlayFit boards across every game — then jump in and beat them. Every score is set with nothing but a webcam and real movement.</p>
+        <h2>The boards</h2>
+        <ul>
+          <li><a href="/dino-survival"><strong>Dino Survival</strong></a> — fastest escape time wins. Run in place to outrun the beast and reach the jeep before anyone else.</li>
+          <li><a href="/brawler"><strong>Monster Punch</strong></a> — highest score wins. Punch and block your way to the top of the arena.</li>
+        </ul>
+        <p>Part of <a href="/">SlayFit fitness AR games</a>.</p>
       </main>`,
   },
 ];
