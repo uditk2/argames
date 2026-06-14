@@ -17,6 +17,11 @@ const GAMES = [
     img: '/assets/backgrounds/Cloudy_Sky-Night_01-1024x512.png' },
 ];
 
+// Contact — set this to Udit's X handle (without the @). Used in the footer.
+const X_HANDLE = 'UditKhandelwal8';
+const X_URL = `https://x.com/${X_HANDLE}`;
+const DISCORD_URL = 'https://discord.gg/H5Ufkukv';
+
 export default function Home({ onPlay }) {
   const rootRef = useRef(null);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -77,33 +82,26 @@ export default function Home({ onPlay }) {
       <nav><div className="wrap row">
         <div className="brand">SLAY<b>FIT</b></div>
         <div className="navlinks">
-          <a href="#games">Games</a><a href="#mission">Mission</a><a href="#how">How it works</a><a href="#stats">Your stats</a>
+          <a href="#games">Games</a><a href="#mission">Mission</a><a href="#how">How it works</a>
           <button className="btn btn-fire navplay" onClick={open}>Play</button>
         </div>
       </div></nav>
 
-      {/* HERO */}
-      <header className="wrap hero">
-        <div className="reveal in">
-          <div className="eyebrow">Webcam AR fitness</div>
-          <h1 className="disp">Get fit <span className="grad">without<br />noticing.</span></h1>
-          <p className="lead">SlayFit turns your webcam into the controller and drops you inside the game. Run from a beast, throw real punches, dodge with your body — a genuine workout you'll forget you're even doing. And it quietly coaches your running as you play.</p>
-          <div className="cta">
-            <button className="btn btn-fire" onClick={open}><PlayIcon /> Start a session</button>
-            <a className="btn btn-line" href="#how">How it works</a>
-          </div>
-          <div className="kpis">
-            <div><div className="n grad">0</div><div className="l">gear required</div></div>
-            <div><div className="n grad">30/s</div><div className="l">pose reads</div></div>
-            <div><div className="n grad">100%</div><div className="l">on-device</div></div>
-          </div>
+      {/* HERO — game-forward: pick a game and play, right at the top */}
+      <header className="wrap hero" id="games">
+        <div className="herohead reveal in">
+          <div className="eyebrow">Webcam AR games · no gear, no headset</div>
+          <h1 className="disp">Pick your game.<br /><span className="grad">Your body's the controller.</span></h1>
+          <p className="lead">No gear, no headset — your webcam reads your movement and drops you inside the game. A real workout you'll forget you're even doing.</p>
         </div>
-        <div className="viewport reveal in">
-          <span className="corner vp-tl" /><span className="corner vp-tr" /><span className="corner vp-bl" /><span className="corner vp-br" />
-          <div className="hud"><span className="rec"><i />Live</span><span>Pose · on-device</span></div>
-          <div className="scan" />
-          <svg className="skel" data-skel viewBox="0 0 300 400" width="100%" height="100%" preserveAspectRatio="xMidYMid meet" />
-          <div className="cadence"><b>178 spm</b><small>cadence detected</small></div>
+        <div className="herogames">
+          {GAMES.map((g) => (
+            <button key={g.id} className="hgcard reveal in" onClick={() => play(g.id)}>
+              <img src={g.img} alt="" /><div className="sh" />
+              <span className="playpill"><PlayIcon /> Play</span>
+              <div className="b"><div className="meta">{g.meta}</div><h3 className="disp">{g.title}</h3><p>{g.desc}</p></div>
+            </button>
+          ))}
         </div>
       </header>
 
@@ -112,19 +110,6 @@ export default function Home({ onPlay }) {
         <div className="eyebrow">Our mission</div>
         <p className="stmt">Make people fit through <span className="grad">games and technology</span> — workouts you actually want to repeat tomorrow.</p>
         <div className="rule" />
-      </div></section>
-
-      {/* GAMES */}
-      <section id="games"><div className="wrap">
-        <div className="reveal"><div className="eyebrow">Choose your session</div><div className="lead-h disp">Two ways to break a sweat.</div></div>
-        <div className="grow">
-          {GAMES.map((g) => (
-            <button key={g.id} className="gcard reveal" onClick={() => play(g.id)}>
-              <img src={g.img} alt="" /><div className="sh" />
-              <div className="b"><div className="meta">{g.meta}</div><h3 className="disp">{g.title}</h3><p>{g.desc}</p></div>
-            </button>
-          ))}
-        </div>
       </div></section>
 
       {/* HOW IT WORKS */}
@@ -140,33 +125,33 @@ export default function Home({ onPlay }) {
         </div>
       </div></section>
 
-      {/* STATS */}
-      <section id="stats"><div className="wrap">
-        <div className="reveal"><div className="eyebrow">Stats &amp; coaching</div>
-          <div className="lead-h disp">Your running, measured every time you play.</div>
-          <p className="sub">We collect your movement stats — cadence, symmetry, consistency, calories — to track progress over time and give you specific, personal recommendations to run better.</p>
+      <footer>
+        <div className="footcta-band wrap reveal">
+          <div className="eyebrow">Move to play</div>
+          <div className="disp grad footbig">Get fit without noticing.</div>
+          <button className="btn btn-fire footcta" onClick={open}><PlayIcon /> Play now</button>
         </div>
-        <div className="report reveal">
-          <div className="rleft">
-            <div className="eyebrow">Run report</div>
-            <div className="ring"><div><b>92%</b><small>CONSISTENCY</small></div></div>
-            <div className="rnote">A high, steady cadence with even left/right balance — you held form as you tired.</div>
+        <div className="footbar wrap">
+          <div className="footbrand">
+            <div className="brand">SLAY<b>FIT</b></div>
+            <p>Move to play — a real workout you'll forget you're even doing.</p>
           </div>
-          <div className="rright">
-            <div className="metric"><span>Avg cadence</span><span className="v">176 <small>spm</small></span></div>
-            <div className="metric"><span>Peak cadence</span><span className="v">198 <small>spm</small></span></div>
-            <div className="metric"><span>Left / right balance</span><span className="v">51 / 49</span></div>
-            <div className="metric"><span>Active time · calories</span><span className="v">48s · ~96</span></div>
-            <div className="reco"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round"><path d="M4 18 L11 11 L15 15 L20 8" /><path d="M20 8 H15 M20 8 V13" /></svg><div><b>Recommendation:</b> aim for <b>180 spm</b> next run. A +4 spm lift is about 5% more efficient for the same effort — and shortening your ground contact will smooth that left-side dip.</div></div>
+          <div className="footlinks">
+            <a href="#games">Games</a>
+            <a href="#mission">Mission</a>
+            <a href="#how">How it works</a>
+            <a className="social" href={X_URL} target="_blank" rel="noopener noreferrer" aria-label={`Contact on X, @${X_HANDLE}`}>
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24h-6.66l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" /></svg>
+              <span>@{X_HANDLE}</span>
+            </a>
+            <a className="social" href={DISCORD_URL} target="_blank" rel="noopener noreferrer" aria-label="Join the Discord server">
+              <svg viewBox="0 0 24 24" fill="currentColor"><path d="M20.317 4.369A19.79 19.79 0 0 0 16.558 3.2a.074.074 0 0 0-.079.037c-.262.466-.555 1.075-.76 1.553a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.772-1.553.077.077 0 0 0-.079-.037A19.74 19.74 0 0 0 3.677 4.369a.07.07 0 0 0-.032.027C1.533 7.51.952 10.58 1.237 13.611a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994a.076.076 0 0 0-.041-.106 13.1 13.1 0 0 1-1.872-.892.077.077 0 0 1-.008-.128c.126-.094.252-.192.372-.291a.074.074 0 0 1 .077-.01c3.928 1.793 8.18 1.793 12.062 0a.074.074 0 0 1 .078.009c.12.099.246.198.373.292a.077.077 0 0 1-.006.127 12.3 12.3 0 0 1-1.873.892.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.84 19.84 0 0 0 6.002-3.03.077.077 0 0 0 .032-.056c.5-3.504-.838-6.549-2.43-9.215a.061.061 0 0 0-.031-.028zM8.02 12.275c-1.182 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" /></svg>
+              <span>Discord</span>
+            </a>
           </div>
         </div>
-      </div></section>
-
-      <footer><div className="wrap reveal">
-        <div className="eyebrow">Move to play</div>
-        <div className="disp grad footbig">Get fit without noticing.</div>
-        <button className="btn btn-fire footcta" onClick={open}><PlayIcon /> Start a session</button>
-      </div></footer>
+        <div className="footnote wrap">© {new Date().getFullYear()} SlayFit. All rights reserved.</div>
+      </footer>
 
       {/* QUICK-PLAY LAUNCHER */}
       <div className={'sf-modal' + (pickerOpen ? ' open' : '')} onClick={(e) => { if (e.target.classList.contains('sf-modal')) close(); }}>
@@ -209,20 +194,31 @@ const CSS = `
 .sf-home .btn-line{color:var(--ink);background:transparent;border:1px solid rgb(var(--magic-rgb)/.4)}
 .sf-home .btn-line:hover{border-color:var(--gold);background:rgb(var(--magic-rgb)/.07)}
 .sf-home .btn svg{width:15px;height:15px}
-.sf-home nav{position:fixed;top:0;left:0;right:0;z-index:40;backdrop-filter:blur(8px);background:linear-gradient(180deg,rgb(var(--realm-rgb)/.7),transparent)}
-.sf-home nav .row{display:flex;align-items:center;justify-content:space-between;height:72px}
+.sf-home > nav{position:fixed;top:0;left:0;right:0;z-index:40;backdrop-filter:blur(8px);background:linear-gradient(180deg,rgb(var(--realm-rgb)/.7),transparent)}
+.sf-home > nav .row{display:flex;align-items:center;justify-content:space-between;height:72px}
 .sf-home .brand{font-family:'Cinzel Decorative',serif;font-weight:900;font-size:21px;letter-spacing:2px}
 .sf-home .brand b{color:var(--gold)}
 .sf-home .navlinks{display:flex;gap:26px;align-items:center;font-size:14px;color:var(--muted)}
 .sf-home .navlinks a:hover{color:var(--ink)}
 .sf-home .navplay{padding:9px 20px}
-.sf-home .hero{min-height:100vh;display:grid;grid-template-columns:1.05fr .95fr;align-items:center;gap:46px;padding-top:72px}
-.sf-home .hero h1{font-size:clamp(40px,6vw,76px);line-height:1.02;letter-spacing:.5px}
-.sf-home .hero .lead{color:#d9d0c1;font-size:clamp(16px,1.6vw,19px);max-width:44ch;margin-top:22px}
-.sf-home .hero .cta{display:flex;gap:12px;margin-top:32px;flex-wrap:wrap}
-.sf-home .kpis{display:flex;gap:34px;margin-top:40px}
-.sf-home .kpis .n{font-family:'Cinzel Decorative',serif;font-weight:900;font-size:28px}
-.sf-home .kpis .l{font-size:12px;color:var(--muted);letter-spacing:.06em;margin-top:2px}
+.sf-home .hero{min-height:100svh;display:grid;grid-template-rows:auto 1fr;align-content:start;gap:clamp(18px,3vh,30px);padding-top:90px;padding-bottom:30px}
+.sf-home .herohead{text-align:center;max-width:820px;margin:0 auto}
+.sf-home .herohead h1{font-size:clamp(32px,4.6vw,56px);line-height:1.06;letter-spacing:.5px;margin-top:10px}
+.sf-home .herohead .lead{color:#d9d0c1;font-size:clamp(16px,1.6vw,18px);max-width:54ch;margin:14px auto 0}
+.sf-home .hero .cta{display:flex;gap:12px;margin-top:26px;justify-content:center;flex-wrap:wrap}
+.sf-home .herogames{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.sf-home .hgcard{position:relative;min-height:clamp(240px,40vh,440px);border-radius:26px;overflow:hidden;border:1px solid rgb(var(--magic-rgb)/.22);cursor:pointer;text-align:left;padding:0;background:none;color:inherit;font:inherit;transition:.25s}
+.sf-home .hgcard:hover{transform:translateY(-5px);border-color:var(--gold);box-shadow:0 30px 72px rgb(var(--fire-rgb)/.26)}
+.sf-home .hgcard img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:.5s}
+.sf-home .hgcard:hover img{transform:scale(1.06)}
+.sf-home .hgcard .sh{position:absolute;inset:0;background:linear-gradient(0deg,rgb(var(--realm-rgb)/.96),rgb(var(--realm-rgb)/.14) 58%,transparent)}
+.sf-home .hgcard .b{position:absolute;bottom:0;padding:28px}
+.sf-home .hgcard h3{font-family:'Cinzel Decorative',serif;font-weight:900;font-size:30px}
+.sf-home .hgcard p{color:#ddd3c2;font-size:15px;margin-top:6px;max-width:42ch}
+.sf-home .hgcard .meta{font-size:11px;letter-spacing:.16em;text-transform:uppercase;color:var(--gold);margin-bottom:9px}
+.sf-home .playpill{position:absolute;top:18px;right:18px;display:inline-flex;align-items:center;gap:7px;font-weight:600;font-size:13px;color:#190c05;background:linear-gradient(90deg,var(--g1),var(--g2));padding:9px 16px;border-radius:999px;opacity:0;transform:translateY(-6px);transition:.22s}
+.sf-home .playpill svg{width:12px;height:12px}
+.sf-home .hgcard:hover .playpill{opacity:1;transform:none}
 .sf-home .viewport{position:relative;aspect-ratio:3/4;max-height:78vh;margin-left:auto;width:100%;border-radius:26px;overflow:hidden;background:radial-gradient(120% 90% at 50% 6%, #211641, #0b0716);border:1px solid rgb(var(--magic-rgb)/.3);box-shadow:0 34px 90px rgba(0,0,0,.6), inset 0 0 60px rgb(var(--magic-rgb)/.06)}
 .sf-home .corner{position:absolute;width:26px;height:26px;border:2px solid rgb(var(--magic-rgb)/.55)}
 .sf-home .vp-tl{top:14px;left:14px;border-right:0;border-bottom:0;border-radius:6px 0 0 0}
@@ -285,9 +281,20 @@ const CSS = `
 .sf-home .reco{margin-top:18px;background:rgb(var(--magic-rgb)/.08);border:1px solid rgb(var(--magic-rgb)/.25);border-radius:14px;padding:15px 17px;font-size:14.5px;color:#ece3d3;line-height:1.55;display:flex;gap:12px}
 .sf-home .reco b{color:var(--gold)}
 .sf-home .reco svg{flex:0 0 auto;width:20px;height:20px;color:var(--gold);margin-top:2px}
-.sf-home footer{padding:96px 0;text-align:center;border-top:1px solid rgba(255,255,255,.06)}
+.sf-home footer{padding:90px 0 26px;border-top:1px solid rgba(255,255,255,.06)}
+.sf-home .footcta-band{text-align:center}
 .sf-home .footbig{font-size:clamp(30px,4.4vw,52px);margin-top:12px}
 .sf-home .footcta{margin-top:26px}
+.sf-home .footbar{display:flex;justify-content:space-between;align-items:flex-end;gap:26px;margin-top:64px;padding-top:30px;border-top:1px solid rgba(255,255,255,.07)}
+.sf-home .footbrand .brand{font-family:'Cinzel Decorative',serif;font-weight:900;font-size:20px;letter-spacing:2px}
+.sf-home .footbrand .brand b{color:var(--gold)}
+.sf-home .footbrand p{color:var(--muted);font-size:13.5px;margin-top:8px;max-width:36ch}
+.sf-home .footlinks{display:flex;gap:24px;align-items:center;font-size:14px;color:var(--muted);flex-wrap:wrap}
+.sf-home .footlinks a:hover{color:var(--ink)}
+.sf-home .footlinks .social{display:inline-flex;align-items:center;gap:8px;color:var(--ink);font-weight:600;padding:7px 14px;border:1px solid rgb(var(--magic-rgb)/.3);border-radius:999px}
+.sf-home .footlinks .social svg{width:15px;height:15px}
+.sf-home .footlinks .social:hover{color:var(--gold);border-color:var(--gold)}
+.sf-home .footnote{margin-top:22px;color:var(--muted);font-size:12.5px;letter-spacing:.04em}
 .sf-home .reveal{opacity:0;transform:translateY(20px);transition:.7s cubic-bezier(.2,.7,.2,1)}
 .sf-home .reveal.in{opacity:1;transform:none}
 .sf-modal{position:fixed;inset:0;z-index:90;display:none;align-items:center;justify-content:center;padding:20px;background:rgba(6,3,12,.8);backdrop-filter:blur(10px)}
@@ -307,6 +314,6 @@ const CSS = `
 .sf-modal .pcard h4{font-family:'Cinzel Decorative',serif;font-weight:900;font-size:20px}
 .sf-modal .pcard .go{margin-top:10px;display:inline-flex;align-items:center;gap:7px;font-weight:600;font-size:13px;color:#190c05;background:linear-gradient(90deg,var(--brand-grad-1),var(--brand-grad-2));padding:8px 16px;border-radius:999px}
 .sf-modal .pcard .go svg{width:12px;height:12px}
-@media(max-width:880px){.sf-home .hero{grid-template-columns:1fr;padding-top:96px;min-height:auto;padding-bottom:50px}.sf-home .viewport{max-height:64vh;max-width:400px}.sf-home .ar,.sf-home .grow,.sf-home .report{grid-template-columns:1fr}.sf-home .rright{border-left:0;border-top:1px solid rgba(255,255,255,.06)}}
+@media(max-width:880px){.sf-home .hero{padding-top:96px;min-height:auto;padding-bottom:50px}.sf-home .ar,.sf-home .report,.sf-home .herogames{grid-template-columns:1fr}.sf-home .rright{border-left:0;border-top:1px solid rgba(255,255,255,.06)}.sf-home .footbar{flex-direction:column;align-items:flex-start;gap:20px}}
 @media(max-width:620px){.sf-modal .pick{grid-template-columns:1fr}.sf-modal .pcard{height:160px}}
 `;
