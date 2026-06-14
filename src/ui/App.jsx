@@ -15,9 +15,7 @@ import Home from './screens/Home.jsx';
 import { track } from '../analytics/ga.js';
 import { punchScores, PUNCH_LEVEL } from '../net/gameClients.js';
 import { getName, getCountry, setCountry } from '../net/identity.js';
-
-const HOME_TITLE = 'SlayFit — Move to play · AR fitness games';
-const GAME_TITLE = { dino: 'Dino Survival — SlayFit', demon: 'Monster Punch — SlayFit' };
+import { routeForPath, routeForGame, applyRouteHead } from '../config/seo-routes.js';
 
 // Best-effort: on a phone, go fullscreen + lock to a target orientation (Android
 // Chrome). iOS Safari ignores orientation.lock — the RotatePrompt overlay covers
@@ -34,18 +32,42 @@ async function lockOrientation(want) {
 // (no prompt). Dino Survival plays in PORTRAIT (its action is vertical); Monster
 // Punch asks for LANDSCAPE only once its actual gameplay starts (see DemonRealm).
 export default function App() {
-  const [game, setGame] = useState(null); // null = home | 'demon' | 'dino'
-  // page title per screen (browser tab + GA page_title)
-  useEffect(() => { document.title = game ? (GAME_TITLE[game] || HOME_TITLE) : HOME_TITLE; }, [game]);
+  // Game state is derived from (and synced to) the URL so each game has its own
+  // shareable, indexable address: / = home, /brawler = 'demon', /dino-survival = 'dino'.
+  const [game, setGame] = useState(
+    () => routeForPath(typeof window !== 'undefined' ? window.location.pathname : '/').game
+  );
+
+  // Keep the <head> (title, description, canonical, OG) in sync with the route.
+  useEffect(() => { applyRouteHead(routeForGame(game)); }, [game]);
+
+  // Back/forward buttons: re-derive the game from the URL.
+  useEffect(() => {
+    const onPop = () => setGame(routeForPath(window.location.pathname).game);
+    window.addEventListener('popstate', onPop);
+    return () => window.removeEventListener('popstate', onPop);
+  }, []);
+
+  // Navigate: push the route's URL (so refresh/share/back all work) then switch game.
+  const navigate = useCallback((g) => {
+    const r = routeForGame(g);
+    if (typeof window !== 'undefined' && window.location.pathname !== r.path) {
+      window.history.pushState({}, '', r.path);
+    }
+    setGame(g);
+  }, []);
+
   const pick = (g) => {
     // GA: one event per launch tagged with the game id, so the Events report
     // ranks which game is played most. (Orientation handled by the native wrapper.)
     track('game_start', { game_id: g, game_name: g === 'dino' ? 'Dino Survival' : 'Monster Punch' });
-    setGame(g);
+    navigate(g);
   };
+  const goHome = () => navigate(null);
+
   return (
     <>
-      {game === 'dino' ? <DinoSurvival onExit={() => setGame(null)} />
+      {game === 'dino' ? <DinoSurvival onExit={goHome} />
         : game === 'demon' ? <DemonRealm />
         : <Home onPlay={pick} />}
     </>

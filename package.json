@@ -6,7 +6,7 @@
   "description": "SlayFit — a webcam workout brawler (MediaPipe pose + PixiJS).",
   "scripts": {
     "dev": "vite",
-    "build": "vite build",
+    "build": "vite build && node scripts/prerender-routes.mjs",
     "preview": "vite preview"
   },
   "dependencies": {

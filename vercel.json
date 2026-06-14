@@ -1,5 +1,7 @@
 {
+  "cleanUrls": true,
   "rewrites": [
-    { "source": "/s", "destination": "/api/share" }
+    { "source": "/s", "destination": "/api/share" },
+    { "source": "/((?!api/|assets/|.*\\.).*)", "destination": "/index.html" }
   ]
 }

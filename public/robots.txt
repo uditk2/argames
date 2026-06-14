@@ -1,0 +1,12 @@
+User-agent: *
+Allow: /
+
+# Let AI crawlers in too (they surface you in LLM answers)
+User-agent: GPTBot
+Allow: /
+User-agent: ClaudeBot
+Allow: /
+User-agent: PerplexityBot
+Allow: /
+
+Sitemap: https://slayfit.fun/sitemap.xml

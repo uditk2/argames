@@ -3,8 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!-- Initial/fallback title; overridden at runtime from src/config/brand.js -->
-    <title>SlayFit — Punch · Block · Burn</title>
+
+    <!-- SEO_HEAD: replaced per-route at build time by scripts/prerender-routes.mjs.
+         (In dev, src/ui/App.jsx sets these from src/config/seo-routes.js at runtime.) -->
+    <!--SEO_HEAD-->
+
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
@@ -13,7 +16,13 @@
     />
   </head>
   <body>
-    <div id="root"></div>
+    <!-- SEO_BODY: per-route crawlable hero injected at build time. Googlebot's first
+         wave and non-JS AI crawlers read it; React replaces it when it mounts. -->
+    <div id="root"><!--SEO_BODY--></div>
+    <noscript>
+      SlayFit is a collection of free webcam fitness AR games — punch, block, dodge and run
+      a cardio workout using just your camera. JavaScript is required to play in your browser.
+    </noscript>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

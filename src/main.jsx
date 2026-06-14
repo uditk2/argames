@@ -2,11 +2,11 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './ui/App.jsx';
 import './index.css';
-import { BRAND } from './config/brand.js';
 import { initGA } from './analytics/ga.js';
 
-// Externalized brand name drives the browser tab title too.
-document.title = `${BRAND.name} — ${BRAND.tagline}`;
+// NOTE: the document <title> + meta description are owned per-route by the App
+// router (src/config/seo-routes.js -> applyRouteHead), so they stay correct as
+// the player navigates between /, /brawler and /dino-survival.
 
 initGA();
 
