@@ -5,7 +5,8 @@
 //   • runtime  (src/ui/App.jsx)        — maps URL <-> game, sets <head> on nav
 //   • buildtime(scripts/prerender-...) — writes a static HTML file per route
 //
-// `game` is App's internal game id: null = home | 'demon' (Monster Punch) | 'dino'.
+// `game` is App's internal game id: null = home | 'demon' (Monster Punch) |
+// 'dino' (Dino Survival) | 'keeper' (Keeper, AR goalkeeping).
 // `view` marks non-game pages that still own a URL (e.g. the standalone
 // leaderboards page). Home is the only game:null route WITHOUT a view.
 // Keep paths in sync with the App router and vercel.json.
@@ -61,6 +62,20 @@ export const ROUTES = [
         <h2>How to play</h2>
         <p>Allow camera access, stand back so your body is in frame, and run in place. Pose tracking turns your stride, jumps and ducks into controls. No camera? Use demo mode.</p>
         <p>Part of <a href="/">SlayFit fitness AR games</a> · also try <a href="/brawler">Monster Punch</a>.</p>
+      </main>`,
+  },
+  {
+    path: '/keeper',
+    game: 'keeper',
+    title: 'Keeper — Webcam AR Goalkeeping Game | SlayFit',
+    description:
+      'Keeper is a free webcam AR goalkeeping game. Your body is scaled to fill the goal — reach and lean to dive and save shots that get faster, swervier and wider every level. Webcam-controlled, no equipment, no download.',
+    body: `<main>
+        <h1>Keeper — Webcam AR Goalkeeping</h1>
+        <p>Keeper is a free webcam AR goalkeeping game. You are the keeper: your body is scaled to fill the goal mouth, so you reach and lean to dive and stop the shots. Each level the ball flies faster, swerves harder, and the goal grows wider — an endless, lives-based reaction and agility workout driven entirely by your webcam.</p>
+        <h2>How to play</h2>
+        <p>Allow camera access and stand back so your head, shoulders and arms are in frame. Pose tracking maps your reach and lean into a diving keeper. No camera? Use demo mode.</p>
+        <p>Part of <a href="/">SlayFit fitness AR games</a> · also try <a href="/brawler">Monster Punch</a> and <a href="/dino-survival">Dino Survival</a>.</p>
       </main>`,
   },
   {

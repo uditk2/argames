@@ -64,6 +64,17 @@ function intParam(v, fallback = 0) {
   return Number.isFinite(n) && n >= 0 ? n : fallback;
 }
 
+// Group a number with COMMAS, locale-independently. We can't use
+// Number.prototype.toLocaleString() here: the Vercel Edge runtime ships a
+// reduced-ICU build whose DEFAULT locale isn't guaranteed to be en-US, so the
+// grouping separator can come out as a narrow no-break space (U+202F, fr) or a
+// dot (de) — neither is in CHARSET nor in the subsetted font, which makes Satori
+// render tofu or throw (→ 500, blank preview). Dino never hit this because it
+// only renders toFixed()/'%' values; the score card is the one that groups.
+function groupInt(n) {
+  return String(Math.trunc(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
 function fmtDur(sec) {
   const s = Math.max(0, Math.round(sec || 0));
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
@@ -161,9 +172,84 @@ async function dinoImage(searchParams) {
   });
 }
 
+// Keeper card — LEVELS CLEARED (hero) + reached level + save% + shots chips.
+// Params: lvls (levels cleared), saves, shots, t (duration seconds).
+async function keeperImage(searchParams) {
+  const lvls = intParam(searchParams.get('lvls'));
+  const saves = intParam(searchParams.get('saves'));
+  const shots = intParam(searchParams.get('shots'));
+  const durationSec = intParam(searchParams.get('t'));
+  const pct = shots > 0 ? Math.round((saves / shots) * 100) : 0;
+  const reached = lvls + 1;
+  const big = groupInt(lvls);
+  const accent = C.gold;
+  // include every glyph the chips render (digits, '%', shots count) in the subset.
+  const extra = `${big}${pct}%${shots}${saves}${reached}`;
+  const [cinzel, fredoka] = await Promise.all([
+    loadGoogleFont('Cinzel Decorative', 900, `${CHARSET}${extra}`),
+    loadGoogleFont('Fredoka', 600, `${CHARSET}${extra}`),
+  ]);
+  const tree = h(
+    'div',
+    {
+      style: {
+        width: W, height: H, display: 'flex', flexDirection: 'column', justifyContent: 'space-between', padding: 64,
+        backgroundColor: C.realm,
+        backgroundImage:
+          'radial-gradient(120% 80% at 50% 115%, rgba(57,217,138,0.34) 0%, rgba(57,217,138,0) 55%),' +
+          'radial-gradient(110% 70% at 50% -15%, rgba(255,182,39,0.30) 0%, rgba(255,182,39,0) 55%),' +
+          `linear-gradient(160deg, ${C.realm2} 0%, ${C.realm} 70%)`,
+        color: C.ink,
+      },
+    },
+    h(
+      'div',
+      { style: { display: 'flex', alignItems: 'center', justifyContent: 'space-between' } },
+      h(
+        'div',
+        { style: { display: 'flex', flexDirection: 'column' } },
+        h('span', { style: { fontFamily: 'Cinzel', fontSize: 56, color: C.gold, letterSpacing: 2 } }, BRAND.wordmark),
+        h('span', { style: { fontFamily: 'Fredoka', fontSize: 24, color: 'rgba(255,182,39,0.85)', letterSpacing: 6 } }, 'KEEPER')
+      ),
+      h(
+        'div',
+        { style: { display: 'flex', fontFamily: 'Fredoka', fontSize: 24, letterSpacing: 6, color: C.ink, padding: '12px 24px', borderRadius: 999, background: 'rgba(57,217,138,0.16)', border: `1px solid ${accent}` } },
+        `REACHED LV ${reached}`
+      )
+    ),
+    h(
+      'div',
+      { style: { display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between' } },
+      h(
+        'div',
+        { style: { display: 'flex', flexDirection: 'column' } },
+        h('span', { style: { fontFamily: 'Fredoka', fontSize: 30, letterSpacing: 8, color: 'rgba(250,244,233,0.65)' } }, 'LEVELS CLEARED'),
+        h('span', { style: { fontFamily: 'Cinzel', fontSize: 200, lineHeight: 1, color: '#ffffff' } }, big),
+        h('span', { style: { fontFamily: 'Fredoka', fontSize: 30, color: C.fireBright, marginTop: 8 } }, `Reached level ${reached}`)
+      ),
+      h(
+        'div',
+        { style: { display: 'flex', flexDirection: 'column', gap: 16 } },
+        chip('SAVE RATE', `${pct}%`, C.gold),
+        chip('SHOTS FACED', String(shots), C.fireBright),
+        chip('TIME', fmtDur(durationSec), C.magic)
+      )
+    )
+  );
+  return new ImageResponse(tree, {
+    width: W, height: H,
+    fonts: [
+      { name: 'Cinzel', data: cinzel, weight: 900, style: 'normal' },
+      { name: 'Fredoka', data: fredoka, weight: 600, style: 'normal' },
+    ],
+    headers: { 'cache-control': 'public, immutable, no-transform, max-age=31536000' },
+  });
+}
+
 export default async function handler(req) {
   try {
     const { searchParams } = new URL(req.url);
+    if (searchParams.get('g') === 'keeper') return await keeperImage(searchParams);
     if (searchParams.get('g') === 'dino') return await dinoImage(searchParams);
     const score = intParam(searchParams.get('score'));
     const slain = intParam(searchParams.get('slain'));
@@ -172,8 +258,9 @@ export default async function handler(req) {
     const comboRaw = searchParams.get('combo');
     const combo = comboRaw != null ? intParam(comboRaw, null) : null;
 
+    const scoreText = groupInt(score);
     const [cinzel, fredoka] = await Promise.all([
-      loadGoogleFont('Cinzel Decorative', 900, `${CHARSET}${score}${slain}${kcal}`),
+      loadGoogleFont('Cinzel Decorative', 900, `${CHARSET}${scoreText}${slain}${kcal}`),
       loadGoogleFont('Fredoka', 600, CHARSET),
     ]);
 
@@ -239,7 +326,7 @@ export default async function handler(req) {
             { style: { fontFamily: 'Fredoka', fontSize: 30, letterSpacing: 8, color: 'rgba(250,244,233,0.65)' } },
             'SCORE'
           ),
-          h('span', { style: { fontFamily: 'Cinzel', fontSize: 200, lineHeight: 1, color: '#ffffff' } }, score.toLocaleString()),
+          h('span', { style: { fontFamily: 'Cinzel', fontSize: 200, lineHeight: 1, color: '#ffffff' } }, scoreText),
           combo != null
             ? h('span', { style: { fontFamily: 'Fredoka', fontSize: 30, color: C.fireBright, marginTop: 8 } }, `Best combo ×${combo}`)
             : null

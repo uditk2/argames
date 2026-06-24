@@ -32,6 +32,18 @@ export function buildShareUrl(stats = {}, origin) {
     });
     return `${base}/s?${p.toString()}`;
   }
+  // Keeper: { g:'keeper', levelsCleared, saves, shots, timeS(duration) }.
+  // Headline metric is levels cleared; saves/shots drive the save% in the copy.
+  if (stats.g === 'keeper') {
+    const p = new URLSearchParams({
+      g: 'keeper',
+      lvls: String(Math.max(0, Math.round(stats.levelsCleared ?? 0))),
+      saves: String(Math.max(0, Math.round(stats.saves ?? 0))),
+      shots: String(Math.max(0, Math.round(stats.shots ?? 0))),
+      t: String(Math.max(0, Math.round(stats.timeS ?? 0))),
+    });
+    return `${base}/s?${p.toString()}`;
+  }
   const p = new URLSearchParams({
     score: String(Math.max(0, Math.round(stats.score ?? 0))),
     slain: String(Math.max(0, Math.round(stats.slain ?? 0))),
@@ -48,6 +60,11 @@ export function shareText(stats = {}) {
     return stats.escaped
       ? `I outran the beast and escaped in ${(stats.timeS ?? 0).toFixed(1)}s on ${BRAND.name} Dino Survival! 🦖 Can you beat my time?`
       : `The beast caught me at ${Math.round(stats.pct ?? 0)}% on ${BRAND.name} Dino Survival 🦖 Can you escape?`;
+  }
+  if (stats.g === 'keeper') {
+    const lvls = Math.max(0, Math.round(stats.levelsCleared ?? 0));
+    const pct = Math.max(0, Math.round(stats.savePct ?? 0));
+    return `I reached level ${lvls + 1} — cleared ${lvls} ${lvls === 1 ? 'level' : 'levels'} (${pct}% save rate) keeping goal on ${BRAND.name} Keeper! 🧤 Can you clear more?`;
   }
   const score = (stats.score ?? 0).toLocaleString();
   return `I cleared the ${BRAND.name} realm — ${score} pts & ${stats.slain ?? 0} demons slain! 🔥 Can you beat it?`;

@@ -1,0 +1,3 @@
+# Generated stadium PNGs land here (stadium-day.png / stadium-night.png /
+# stadium-finals.png). Created by ../../generate-backgrounds.mjs. Optional —
+# the runtime falls back to procedural canvas art when these are absent.

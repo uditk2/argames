@@ -15,6 +15,11 @@ const GAMES = [
   { id: 'demon', title: 'Monster Punch', meta: 'Upper body · boxing & reflexes',
     desc: 'Punch what flies in and block with your arms — an arms, shoulders & reflex workout.',
     img: '/assets/backgrounds/Cloudy_Sky-Night_01-1024x512.png' },
+  // Keeper card art: a downscaled crop of the night-stadium backdrop
+  // (derived from src/games/keeper/theme/assets/bg/stadium-night.png).
+  { id: 'keeper', title: 'Keeper', meta: 'Reflexes & agility · goalkeeping',
+    desc: 'Your body fills the goal — reach and dive to save shots that get faster and swervier each level.',
+    img: '/assets/keeper/tile.png' },
 ];
 
 // Contact — set this to Udit's X handle (without the @). Used in the footer.
@@ -100,8 +105,8 @@ export default function Home({ onPlay, onOpenLeaderboard }) {
         </div>
         <div className="herogames">
           {GAMES.map((g) => (
-            <button key={g.id} className="hgcard reveal in" onClick={() => play(g.id)}>
-              <img src={g.img} alt="" /><div className="sh" />
+            <button key={g.id} className={'hgcard reveal in hg-' + g.id} onClick={() => play(g.id)}>
+              <img src={g.img} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} /><div className="sh" />
               <span className="playpill"><PlayIcon /> Play</span>
               <div className="b"><div className="meta">{g.meta}</div><h3 className="disp">{g.title}</h3><p>{g.desc}</p></div>
             </button>
@@ -167,7 +172,7 @@ export default function Home({ onPlay, onOpenLeaderboard }) {
           <div className="pick">
             {GAMES.map((g) => (
               <button key={g.id} className="pcard" onClick={() => play(g.id)}>
-                <img src={g.img} alt="" /><div className="sh" />
+                <img src={g.img} alt="" onError={(e) => { e.currentTarget.style.display = 'none'; }} /><div className="sh" />
                 <div className="b"><div className="meta">{g.meta}</div><h4 className="disp">{g.title}</h4><span className="go"><PlayIcon /> Play</span></div>
               </button>
             ))}
@@ -214,12 +219,13 @@ const CSS = `
 .sf-home .herocta{margin-top:18px;display:flex;justify-content:center}
 .sf-home .boardlink{display:inline-flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:var(--gold);padding:9px 18px;border-radius:999px;border:1px solid rgb(var(--magic-rgb)/.4);transition:.2s}
 .sf-home .boardlink:hover{color:var(--ink);border-color:var(--gold);background:rgb(var(--magic-rgb)/.08)}
-.sf-home .herogames{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+.sf-home .herogames{display:grid;grid-template-columns:repeat(3,1fr);gap:24px}
 .sf-home .hgcard{position:relative;min-height:clamp(240px,40vh,440px);border-radius:26px;overflow:hidden;border:1px solid rgb(var(--magic-rgb)/.22);cursor:pointer;text-align:left;padding:0;background:none;color:inherit;font:inherit;transition:.25s}
 .sf-home .hgcard:hover{transform:translateY(-5px);border-color:var(--gold);box-shadow:0 30px 72px rgb(var(--fire-rgb)/.26)}
 .sf-home .hgcard img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transition:.5s}
 .sf-home .hgcard:hover img{transform:scale(1.06)}
 .sf-home .hgcard .sh{position:absolute;inset:0;background:linear-gradient(0deg,rgb(var(--realm-rgb)/.96),rgb(var(--realm-rgb)/.14) 58%,transparent)}
+.sf-home .hg-keeper .sh{background:linear-gradient(0deg,rgb(var(--realm-rgb)/.97),rgb(var(--realm-rgb)/.42) 52%,rgb(var(--realm-rgb)/.22))}
 .sf-home .hgcard .b{position:absolute;bottom:0;padding:28px}
 .sf-home .hgcard h3{font-family:'Cinzel Decorative',serif;font-weight:900;font-size:30px}
 .sf-home .hgcard p{color:#ddd3c2;font-size:15px;margin-top:6px;max-width:42ch}
@@ -322,6 +328,7 @@ const CSS = `
 .sf-modal .pcard h4{font-family:'Cinzel Decorative',serif;font-weight:900;font-size:20px}
 .sf-modal .pcard .go{margin-top:10px;display:inline-flex;align-items:center;gap:7px;font-weight:600;font-size:13px;color:#190c05;background:linear-gradient(90deg,var(--brand-grad-1),var(--brand-grad-2));padding:8px 16px;border-radius:999px}
 .sf-modal .pcard .go svg{width:12px;height:12px}
+@media(max-width:980px){.sf-home .herogames{grid-template-columns:1fr 1fr}}
 @media(max-width:880px){.sf-home .hero{padding-top:96px;min-height:auto;padding-bottom:50px}.sf-home .ar,.sf-home .report,.sf-home .herogames{grid-template-columns:1fr}.sf-home .rright{border-left:0;border-top:1px solid rgba(255,255,255,.06)}.sf-home .footbar{flex-direction:column;align-items:flex-start;gap:20px}}
 @media(max-width:620px){.sf-modal .pick{grid-template-columns:1fr}.sf-modal .pcard{height:160px}}
 `;

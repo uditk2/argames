@@ -27,6 +27,7 @@ import { sql, dbReady, applyCors, json, requireWrite, overRateLimit } from './_d
 const GAMES = {
   'dino-survival': { metric: 'time',  levels: new Set(['EASY', 'MEDIUM', 'HARD', 'IMPOSSIBLE']) },
   'monster-punch': { metric: 'score', levels: new Set(['DEFAULT']) },
+  'keeper':        { metric: 'score', levels: new Set(['DEFAULT']) },
 };
 
 const clampPct = (v) => Math.max(0, Math.min(100, Math.round(Number(v) || 0)));

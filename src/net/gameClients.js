@@ -17,5 +17,13 @@ export const punchScores = createScoreClient('monster-punch', {
   cachePrefix: 'slayfit_monster_punch_v1',
 });
 
-// Monster Punch has a single global board (no difficulty levels).
+// Keeper (AR goalkeeping): SCORE metric (most LEVELS CLEARED wins — save >=60%
+// of each level's shots to advance), single global board.
+export const keeperScores = createScoreClient('keeper', {
+  metric: 'score',
+  cachePrefix: 'slayfit_keeper_v1',
+});
+
+// Single-board games (no difficulty levels).
 export const PUNCH_LEVEL = 'DEFAULT';
+export const KEEPER_LEVEL = 'DEFAULT';

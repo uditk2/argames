@@ -29,6 +29,12 @@ function fmtDur(sec) {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 }
 
+// Comma-grouped integer, locale-independent (the Edge runtime's default locale
+// isn't guaranteed en-US, so toLocaleString() can group with a dot / nbsp).
+function groupInt(n) {
+  return String(Math.trunc(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+}
+
 export default function handler(req, res) {
   const q = req.query || {};
   const score = int(q.score);
@@ -43,7 +49,18 @@ export default function handler(req, res) {
   const origin = `${proto}://${host}`;
 
   let ogParams, title, desc;
-  if (q.g === 'dino') {
+  if (q.g === 'keeper') {
+    // Keeper: lvls (levels cleared, headline), saves, shots, t (duration seconds).
+    // Save% derived for the copy. Reached level = cleared + 1.
+    const lvls = int(q.lvls);
+    const saves = int(q.saves);
+    const shots = int(q.shots);
+    const t = int(q.t);
+    const pct = shots > 0 ? Math.round((saves / shots) * 100) : 0;
+    ogParams = new URLSearchParams({ g: 'keeper', lvls: String(lvls), saves: String(saves), shots: String(shots), t: String(t) });
+    title = `Reached level ${groupInt(lvls + 1)} as keeper`;
+    desc = `I cleared ${lvls} ${lvls === 1 ? 'level' : 'levels'} (${pct}% save rate) keeping goal on ${BRAND.name} Keeper. Think you can clear more?`;
+  } else if (q.g === 'dino') {
     // Dino Survival: esc (1|0), dt (escape/survive time in deci-seconds), pct (distance %).
     const escaped = q.esc === '1';
     const dt = int(q.dt);
@@ -57,7 +74,7 @@ export default function handler(req, res) {
   } else {
     ogParams = new URLSearchParams({ score: String(score), slain: String(slain), kcal: String(kcal), t: String(durationSec) });
     if (combo != null) ogParams.set('combo', String(combo));
-    title = `${score.toLocaleString()} pts in ${BRAND.name}`;
+    title = `${groupInt(score)} pts in ${BRAND.name}`;
     desc = `I cleared the realm — ${slain} demons slain, ${kcal} kcal burned in ${fmtDur(durationSec)}. Think you can beat it?`;
   }
 

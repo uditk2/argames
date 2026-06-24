@@ -1,0 +1,239 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Keeper AR — Theme Preview</title>
+<style>
+  /* Brand palette mirrored from src/index.css so the modules read live vars. */
+  :root {
+    color-scheme: dark;
+    --magic-rgb: 255 182 39; --fire-rgb: 255 122 60; --fire-bright-rgb: 255 194 94;
+    --gold-rgb: 255 213 74; --shield-rgb: 87 227 255; --ink-rgb: 250 244 233;
+    --realm-rgb: 10 6 18; --realm-tint-rgb: 36 22 12;
+    --magic: rgb(var(--magic-rgb)); --fire: rgb(var(--fire-rgb));
+    --fire-bright: rgb(var(--fire-bright-rgb)); --gold: rgb(var(--gold-rgb));
+    --ink: rgb(var(--ink-rgb)); --realm: rgb(var(--realm-rgb));
+    --panel: rgba(26,18,10,0.55); --panel-border: rgb(var(--magic-rgb)/0.4);
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--realm); color: var(--ink);
+         font: 14px/1.5 'Fredoka', system-ui, sans-serif; }
+  header { padding: 14px 18px; border-bottom: 1px solid var(--panel-border);
+           display: flex; align-items: center; gap: 12px; }
+  header h1 { margin: 0; font-size: 18px; font-weight: 700; }
+  header .tag { color: rgb(var(--magic-rgb)); letter-spacing: .2em; font-size: 11px; text-transform: uppercase; }
+  .wrap { padding: 18px; display: grid; gap: 22px; max-width: 1100px; margin: 0 auto; }
+  .card { background: var(--panel); border: 1px solid var(--panel-border);
+          border-radius: 16px; padding: 14px; backdrop-filter: blur(8px); }
+  .card h2 { margin: 0 0 10px; font-size: 14px; color: rgb(var(--gold-rgb)); letter-spacing: .04em; }
+  /* Stage that mimics the in-game canvas. */
+  #stageWrap { position: relative; }
+  #stage { width: 100%; aspect-ratio: 16/9; border-radius: 12px; display: block; background: #000; }
+  .controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 10px; }
+  button { padding: 7px 13px; border-radius: 9px; background: rgba(255,255,255,.06);
+           color: var(--ink); border: 1px solid var(--panel-border); font: inherit; cursor: pointer; }
+  button.primary { background: rgb(var(--magic-rgb)); color: #1a1206; border-color: rgb(var(--magic-rgb)); font-weight: 700; }
+  button:hover { border-color: var(--gold); }
+  label.ctl { display: inline-flex; gap: 6px; align-items: center; font-size: 12px; color: #a89e8c; }
+  input[type=range] { width: 130px; accent-color: rgb(var(--magic-rgb)); }
+  /* Icon grid. */
+  .icons { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px,1fr)); gap: 10px; }
+  .icon { display: flex; flex-direction: column; align-items: center; gap: 6px;
+          padding: 12px 6px; border-radius: 12px; background: rgba(255,255,255,.03);
+          border: 1px solid rgba(255,255,255,.06); }
+  .icon svg { width: 30px; height: 30px; }
+  .icon .name { font-size: 11px; color: #a89e8c; }
+  /* Sound buttons. */
+  .sounds { display: flex; flex-wrap: wrap; gap: 8px; }
+  .sounds button { display: inline-flex; align-items: center; gap: 6px; }
+  .legend { font-size: 12px; color: #a89e8c; margin-top: 8px; }
+  .swatches { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px; }
+  .sw { width: 56px; height: 40px; border-radius: 8px; border: 1px solid rgba(255,255,255,.1);
+        display: flex; align-items: flex-end; font-size: 9px; padding: 3px; color: #000; font-weight: 700; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Keeper AR</h1>
+  <span class="tag">Theme Preview · floodlit arena</span>
+</header>
+
+<div class="wrap">
+  <div class="card">
+    <h2>Stadium background + goal + ball + keeper aura</h2>
+    <div id="stageWrap"><canvas id="stage"></canvas></div>
+    <div class="controls">
+      <label class="ctl">Level <input id="level" type="range" min="1" max="12" step="1" value="3" /></label>
+      <span id="levelv" style="color:var(--gold);font-weight:700">L3</span>
+      <label class="ctl"><input id="anim" type="checkbox" checked /> animate</label>
+      <label class="ctl"><input id="useImg" type="checkbox" /> use generated PNG (if present)</label>
+      <button id="shoot">Fire a ball</button>
+    </div>
+    <div class="legend">If a PNG exists in <code>assets/bg/</code> it is used; otherwise the procedural night-stadium art renders. Floodlights, crowd sparks and pitch sheen are live.</div>
+    <div class="swatches" id="swatches"></div>
+  </div>
+
+  <div class="card">
+    <h2>Icon glyphs (replace the emoji)</h2>
+    <div class="icons" id="iconGrid"></div>
+  </div>
+
+  <div class="card">
+    <h2>Sound bank (Web Audio — click to play)</h2>
+    <div class="controls">
+      <button id="ambience" class="primary">Start crowd ambience</button>
+      <button id="mute">Mute</button>
+    </div>
+    <div class="sounds" id="soundBtns" style="margin-top:10px"></div>
+    <div class="legend">All synthesized at runtime — no sample files, no network, no copyrighted audio.</div>
+  </div>
+</div>
+
+<script type="module">
+import KEEPER_THEME from '../theme.js';
+import { ICON, icon } from './icons.js';
+import {
+  drawBackground, drawGoalFrame, drawBall, drawKeeperGlow, loadBackgroundImage,
+} from './background.js';
+import { createKeeperAudio } from './keeperAudio.js';
+
+const T = KEEPER_THEME;
+const canvas = document.getElementById('stage');
+const ctx = canvas.getContext('2d');
+let dpr = Math.min(2, window.devicePixelRatio || 1);
+
+function size() {
+  const r = canvas.getBoundingClientRect();
+  canvas.width = Math.max(1, Math.round(r.width * dpr));
+  canvas.height = Math.max(1, Math.round(r.height * dpr));
+}
+new ResizeObserver(size).observe(canvas);
+size();
+
+let level = 3, animate = true, useImg = false, bgImage = null;
+let ball = null; // {x,y,r,spin,vy}
+
+function goalRect(w, h) {
+  const L = T.layout.goal;
+  return { x0: w * L.x0, x1: w * L.x1, y0: h * L.y0, y1: h * L.y1 };
+}
+
+function frame(now) {
+  const w = canvas.width, h = canvas.height;
+  const intensity = T.intensity(level);
+  const time = animate ? now : 1000;
+  ctx.clearRect(0, 0, w, h);
+  drawBackground(ctx, { w, h, level, intensity, time, bgImage: useImg ? bgImage : null });
+  const g = goalRect(w, h);
+  drawKeeperGlow(ctx, g, { intensity });
+  drawGoalFrame(ctx, g, { intensity });
+
+  // Demo keeper silhouette (static gold blob so you can see layering).
+  ctx.save();
+  ctx.shadowColor = T.roles.keeperGlow; ctx.shadowBlur = 22 * dpr;
+  ctx.fillStyle = T.roles.keeper;
+  const cx = (g.x0 + g.x1) / 2, cy = (g.y0 + g.y1) / 2;
+  ctx.beginPath();
+  ctx.ellipse(cx, cy + (g.y1 - g.y0) * 0.1, (g.x1 - g.x0) * 0.13, (g.y1 - g.y0) * 0.3, 0, 0, 7);
+  ctx.fill();
+  // arms
+  ctx.strokeStyle = T.roles.keeperLimb; ctx.lineWidth = 22 * dpr; ctx.lineCap = 'round';
+  ctx.beginPath();
+  ctx.moveTo(cx - (g.x1 - g.x0) * 0.28, cy - (g.y1 - g.y0) * 0.05);
+  ctx.lineTo(cx, cy - (g.y1 - g.y0) * 0.1);
+  ctx.lineTo(cx + (g.x1 - g.x0) * 0.28, cy - (g.y1 - g.y0) * 0.05);
+  ctx.stroke();
+  // gloves
+  ctx.shadowColor = T.rgba.gold(0.9);
+  ctx.fillStyle = T.roles.keeperGlove;
+  for (const sgn of [-1, 1]) {
+    ctx.beginPath();
+    ctx.arc(cx + sgn * (g.x1 - g.x0) * 0.28, cy - (g.y1 - g.y0) * 0.05, 16 * dpr, 0, 7);
+    ctx.fill();
+  }
+  ctx.restore();
+
+  // Ball physics demo.
+  if (ball) {
+    ball.x += (cx - ball.x) * 0.04;
+    ball.y += ball.vy; ball.vy += 0.12 * dpr;
+    ball.r += (28 * dpr - ball.r) * 0.03;
+    ball.spin += 0.16;
+    drawBall(ctx, { x: ball.x, y: ball.y, r: ball.r, spin: ball.spin });
+    if (ball.y > h * 0.9) ball = null;
+  }
+
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+// Try to load a generated bg (silently null if missing).
+loadBackgroundImage(T.bgForLevel(level)).then((img) => { bgImage = img; });
+
+// --- controls ---
+const levelEl = document.getElementById('level');
+levelEl.oninput = () => {
+  level = +levelEl.value; document.getElementById('levelv').textContent = 'L' + level;
+  loadBackgroundImage(T.bgForLevel(level)).then((img) => { bgImage = img; });
+};
+document.getElementById('anim').onchange = (e) => (animate = e.target.checked);
+document.getElementById('useImg').onchange = (e) => (useImg = e.target.checked);
+document.getElementById('shoot').onclick = () => {
+  const w = canvas.width, h = canvas.height;
+  ball = { x: w * (0.3 + Math.random() * 0.4), y: h * 0.45, r: 6 * dpr, spin: 0, vy: -1 };
+  audio.play('save');
+};
+
+// --- swatches ---
+const sw = document.getElementById('swatches');
+[['magic', T.color.magic], ['gold', T.color.gold], ['fire', T.color.fire],
+ ['fireBright', T.color.fireBright], ['ink', T.color.ink]].forEach(([n, c]) => {
+  const d = document.createElement('div');
+  d.className = 'sw'; d.style.background = c; d.textContent = n;
+  sw.appendChild(d);
+});
+
+// --- icons ---
+const grid = document.getElementById('iconGrid');
+const ICON_COLORS = {
+  glove: 'var(--magic)', ball: 'var(--ink)', save: 'var(--gold)', goal: 'var(--fire)',
+  whistle: 'var(--ink)', level: 'var(--gold)', heart: 'var(--fire)', heartEmpty: '#5a5048',
+  telemetry: 'var(--magic)', target: 'var(--gold)', play: 'var(--gold)', restart: 'var(--ink)',
+  soundOn: 'var(--ink)', soundOff: '#a89e8c', stadium: 'var(--magic)',
+};
+for (const name of Object.keys(ICON)) {
+  const el = document.createElement('div');
+  el.className = 'icon';
+  el.innerHTML = icon(name, { color: ICON_COLORS[name] || 'var(--ink)' }) +
+    `<span class="name">${name}</span>`;
+  grid.appendChild(el);
+}
+
+// --- sounds ---
+const audio = createKeeperAudio();
+const soundBtns = document.getElementById('soundBtns');
+for (const name of audio.names) {
+  const b = document.createElement('button');
+  b.textContent = name;
+  b.onclick = () => { audio.unlock(); audio.play(name); };
+  soundBtns.appendChild(b);
+}
+let ambienceOn = false;
+const ambBtn = document.getElementById('ambience');
+ambBtn.onclick = () => {
+  audio.unlock();
+  ambienceOn = !ambienceOn;
+  if (ambienceOn) { audio.startAmbience(); ambBtn.textContent = 'Stop crowd ambience'; }
+  else { audio.stopAmbience(); ambBtn.textContent = 'Start crowd ambience'; }
+};
+const muteBtn = document.getElementById('mute');
+muteBtn.onclick = () => {
+  const m = audio.setMuted(!audio.isMuted());
+  muteBtn.textContent = m ? 'Unmute' : 'Mute';
+  muteBtn.innerHTML = (m ? icon('soundOff', { color: 'var(--ink)' }) : icon('soundOn', { color: 'var(--ink)' })) +
+    (m ? ' Unmute' : ' Mute');
+};
+</script>
+</body>
+</html>
