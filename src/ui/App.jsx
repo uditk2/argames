@@ -74,6 +74,10 @@ export default function App() {
     return <LeaderboardPage onExit={goHome} onPlay={pick} />;
   }
 
+  if (route.view === 'blog') {
+    return <BlogPage route={route} onNavigate={go} onExit={goHome} />;
+  }
+
   return (
     <>
       {route.game === 'dino' ? <DinoSurvival onExit={goHome} />
@@ -81,6 +85,47 @@ export default function App() {
         : route.game === 'demon' ? <DemonRealm />
         : <Home onPlay={pick} onOpenLeaderboard={openLeaderboard} />}
     </>
+  );
+}
+
+// Blog pages render the route's crawlable `body` HTML for humans. Internal
+// link clicks are intercepted so they navigate via the SPA router (no full
+// reload), keeping the prerendered articles and the live app in sync.
+function BlogPage({ route, onNavigate, onExit }) {
+  const onClick = useCallback((e) => {
+    const a = e.target.closest && e.target.closest('a');
+    if (!a) return;
+    const href = a.getAttribute('href') || '';
+    if (href.startsWith('/') && !href.startsWith('//')) {
+      e.preventDefault();
+      onNavigate(href);
+    }
+  }, [onNavigate]);
+
+  return (
+    <div className="relative w-screen h-screen overflow-y-auto overscroll-contain bg-realm text-ink">
+      <div className="mx-auto w-[min(92vw,720px)] px-1 py-8 sm:py-12">
+        <nav className="mb-6 flex items-center gap-3 text-sm">
+          <button
+            onClick={onExit}
+            className="px-3 py-1.5 rounded-xl font-semibold text-ink/85 bg-realm/50 border border-magic/30 hover:border-magic/60 transition"
+          >
+            ← SlayFit Games
+          </button>
+          <button
+            onClick={() => onNavigate('/blog')}
+            className="px-3 py-1.5 rounded-xl font-semibold text-ink/70 hover:text-ink border border-transparent hover:border-magic/40 transition"
+          >
+            Blog
+          </button>
+        </nav>
+        <div
+          className="slayfit-prose"
+          onClick={onClick}
+          dangerouslySetInnerHTML={{ __html: route.body }}
+        />
+      </div>
+    </div>
   );
 }
 

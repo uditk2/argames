@@ -1,0 +1,22 @@
+# SlayFit
+
+> SlayFit is a collection of free, no-download games you play with your webcam — your body is the controller. It includes an AR football goalkeeper game, a webcam boxing brawler, and a run-in-place endless runner, all instant in the browser.
+
+SlayFit runs entirely in the web browser: there is nothing to install and no app store. Each game uses real-time webcam pose tracking, so your real movement drives the action. Every game is free and works on the device you already have. A demo mode is available when no camera is present. Site: https://slayfit.fun
+
+## Games
+
+- [Keeper — AR football game](https://slayfit.fun/keeper): A free, no-download AR football game. You are the webcam goalkeeper — your body is scaled to fill the goal, and you dive and lean to save shots that get faster, swervier and wider every level. Play the AR football game today.
+- [Monster Punch — free online punch game](https://slayfit.fun/brawler): A free online punch game / webcam boxing brawler in the spirit of classic punch-out games. Throw real punches at incoming monsters, raise both arms to block, and dodge ground traps for a timed cardio round — a no-download, punch-out-style boxing game you play online with your body.
+- [Dino Survival — T-Rex run](https://slayfit.fun/dino-survival): A free T-Rex run (trex run) endless runner. Jog on the spot to outrun the beast and reach the jeep, jumping and ducking obstacles with real movement — a full-body, no-download take on the classic T-Rex run game.
+
+## Guides / Blog
+
+- [SlayFit Blog](https://slayfit.fun/blog): Guides and explainers about SlayFit's free no-download webcam games.
+- [Free No-Download Games: Popular Browser Games You Can Play Today](https://slayfit.fun/blog/free-no-download-games): What no-download games are, why they are popular, and a curated list of free webcam games you can play today.
+- [AR Football Game You Can Play Today — Be the Webcam Goalkeeper](https://slayfit.fun/blog/ar-football-game): How SlayFit's AR football game works — pose tracking, levels and save percentage — and why webcam goalkeeping is a fun, instant, no-download way to play.
+
+## About
+
+- [SlayFit home](https://slayfit.fun/): Overview of all the free no-download webcam AR games.
+- [Leaderboard](https://slayfit.fun/leaderboard): Top SlayFit players worldwide — fastest Dino Survival times and highest Monster Punch scores.

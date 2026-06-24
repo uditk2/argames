@@ -13,3 +13,4 @@ dino-survival-media/
 ._grotto_*
 grotto_tmp_*
 .trashbin/
+.claude/

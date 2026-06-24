@@ -90,3 +90,33 @@ body {
 .animate-blink {
   animation: blink 1.1s steps(1) infinite;
 }
+
+/* Blog / article prose — used by the /blog routes (App.jsx BlogPage). */
+.slayfit-prose { line-height: 1.7; color: rgb(255 255 255 / 0.88); }
+.slayfit-prose h1 {
+  font-family: var(--font-display, inherit);
+  font-weight: 900;
+  font-size: clamp(1.7rem, 4vw, 2.4rem);
+  line-height: 1.15;
+  margin: 0 0 0.75rem;
+  background: linear-gradient(to bottom, var(--brand-grad-1), var(--brand-grad-2));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.slayfit-prose h2 {
+  font-weight: 700;
+  font-size: clamp(1.15rem, 2.6vw, 1.45rem);
+  margin: 1.8rem 0 0.6rem;
+  color: rgb(var(--magic-rgb));
+}
+.slayfit-prose p { margin: 0 0 1rem; }
+.slayfit-prose ul { margin: 0 0 1.2rem; padding-left: 1.2rem; list-style: disc; }
+.slayfit-prose li { margin: 0 0 0.5rem; }
+.slayfit-prose a {
+  color: rgb(var(--fire-bright-rgb));
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.slayfit-prose a:hover { color: rgb(var(--magic-rgb)); }
+.slayfit-prose strong { color: #fff; }
