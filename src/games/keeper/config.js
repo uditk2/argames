@@ -30,16 +30,16 @@ export const KEEPER = {
   // pose does NOT fill the goal, so corners require an active reach/dive.
   // NOTE: REACH_SCALE / LEAN_AMP here are the LEVEL-1 BASE values. The engine /
   // geometry consume levelCurve(level).reach + .leanAmp, which SHRINK with level.
-  REACH_SCALE: 0.82,        // body-extent multiplier across the goal (BASE_REACH; shrinks per level) — standing leaves a gap from the posts
-  REACH_SCALE_Y: 0.82,      // vertical extent multiplier (legs/torso reach down) — gap from crossbar/ground too
-  LEAN_AMP: 2.0,            // how far a hip-lean dives across the goal (BASE_LEAN; shrinks per level) — bigger so you can still reach corners by diving
+  REACH_SCALE: 1.02,        // body-extent multiplier across the goal (BASE_REACH; shrinks per level) — standing now nearly fills the mouth
+  REACH_SCALE_Y: 1.02,      // vertical extent multiplier (legs/torso reach down) — covers crossbar-to-ground too
+  LEAN_AMP: 2.4,            // how far a hip-lean dives across the goal (BASE_LEAN; shrinks per level) — bigger so corners are easy to reach
   LEAN_RECENTER: 0.05,      // per-frame recentre toward your standing base between shots (0..1)
 
   // Save hit radii as a FRACTION of stage height (limbs are capsules, the torso
   // is a filled polygon). Smaller = you must be more precise.
-  LIMB_R_FRAC: 0.040,
-  GLOVE_R_FRAC: 0.046,
-  HEAD_R_FRAC: 0.050,
+  LIMB_R_FRAC: 0.050,
+  GLOVE_R_FRAC: 0.058,
+  HEAD_R_FRAC: 0.060,
 
   // Visibility floor for a landmark to count toward a save / to be drawn.
   VIS_MIN: 0.2,
@@ -49,7 +49,7 @@ export const KEEPER = {
 // The goal is centered. Its WIDTH grows with level (see levelCurve). Height is
 // fixed; x-span is derived from the current width fraction.
 export const GOAL = {
-  WIDTH_FRAC_BASE: 0.52,    // goal-mouth width as a fraction of stage width at level 1
+  WIDTH_FRAC_BASE: 0.42,    // goal-mouth width as a fraction of stage width at level 1 (narrower → easier early)
   WIDTH_FRAC_MAX: 0.90,     // cap so it never exceeds the frame
   Y0_FRAC: 0.12,            // crossbar
   Y1_FRAC: 0.90,            // goal line (where saves are judged)
@@ -92,21 +92,21 @@ export const RAMP = {
 
   // Goal width fraction grows with level -> more area to cover.
   //   widthFrac = min(WIDTH_MAX, WIDTH_BASE + WIDTH_STEP*n)
-  WIDTH_BASE: 0.52,
+  WIDTH_BASE: 0.42,
   WIDTH_STEP: 0.04,
   WIDTH_MAX: 0.90,
 
   // Keeper reach/size + lean SHRINK with level (the player's coverage shrinks).
   //   reach   = max(REACH_MIN, BASE_REACH - REACH_STEP*n)
   //   leanAmp = max(LEAN_MIN,  BASE_LEAN  - LEAN_STEP*n)
-  REACH_STEP: 0.025,
-  REACH_MIN: 0.80,
+  REACH_STEP: 0.02,
+  REACH_MIN: 0.88,
   LEAN_STEP: 0.04,
-  LEAN_MIN: 1.30,
+  LEAN_MIN: 1.40,
 
   // Aim: probability the shooter targets a CORNER (vs. a softer central shot).
   // Climbs with level so higher levels punish a standing keeper harder.
-  CORNER_BASE: 0.40,
+  CORNER_BASE: 0.25,
   CORNER_STEP: 0.06,
   CORNER_MAX: 0.90,
 };

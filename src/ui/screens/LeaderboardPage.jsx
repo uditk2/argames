@@ -7,7 +7,7 @@
 // ===========================================================================
 import React, { useState } from 'react';
 import Leaderboard from '../Leaderboard.jsx';
-import { dinoScores, punchScores, PUNCH_LEVEL } from '../../net/gameClients.js';
+import { dinoScores, punchScores, keeperScores, PUNCH_LEVEL, KEEPER_LEVEL } from '../../net/gameClients.js';
 import { DEFAULT_LEVEL as DINO_LEVEL } from '../../games/dino-survival/index.js';
 
 // One entry per game with the board it should render. `showMeta:false` for Dino
@@ -18,6 +18,11 @@ const TABS = [
     id: 'dino', title: 'Dino Survival', tag: 'Fastest escape',
     client: dinoScores, level: DINO_LEVEL, label: null, showMeta: false,
     bg: '/assets/dino-survival/bg/trail.png',
+  },
+  {
+    id: 'keeper', title: 'Keeper', tag: 'Most levels',
+    client: keeperScores, level: KEEPER_LEVEL, label: null, showMeta: false,
+    bg: '/assets/keeper/bg/stadium-day.png',
   },
   {
     id: 'demon', title: 'Monster Punch', tag: 'Highest score',

@@ -454,8 +454,8 @@ export default function Keeper({ onExit }) {
         </>
       )}
 
-      {/* LEADERBOARD overlay (intro) */}
-      {showBoard && screen === 'intro' && (
+      {/* LEADERBOARD overlay (intro + result) — opened by the "Ranks" button */}
+      {showBoard && (screen === 'intro' || screen === 'result') && (
         <Center>
           <Leaderboard client={scores} level={KEEPER_LEVEL} showMeta={false} onClose={() => setShowBoard(false)} />
         </Center>
@@ -502,7 +502,7 @@ export default function Keeper({ onExit }) {
       )}
 
       {/* RESULT */}
-      {screen === 'result' && result && (
+      {!showBoard && screen === 'result' && result && (
         <Center>
           <div className="font-display font-black text-2xl sm:text-3xl"><span className="text-gold">{result.levelsCleared ?? result.score ?? 0} {(result.levelsCleared ?? result.score ?? 0) === 1 ? 'LEVEL' : 'LEVELS'} CLEARED</span></div>
           <div className="text-[11px] tracking-[0.24em] text-magic/80 mt-0.5 uppercase mb-1">reached level {result.level} · {result.savePct}% save rate</div>
@@ -513,10 +513,6 @@ export default function Keeper({ onExit }) {
             <RC k="Best (levels)" v={best && best.score != null ? String(best.score) : '—'} />
           </div>
           {result.isNew && <p className="text-gold font-extrabold mb-1.5">New personal best!</p>}
-
-          {board && board.length > 0 && (
-            <div className="my-3"><Leaderboard client={scores} level={KEEPER_LEVEL} rows={board.slice(0, 5)} compact showMeta={false} /></div>
-          )}
 
           {clip && clip.url && (
             <div className="my-3">
@@ -530,6 +526,7 @@ export default function Keeper({ onExit }) {
             <button onClick={shareClip} disabled={!clip || !clip.blob} className="px-4 py-2.5 rounded-xl font-semibold text-ink/90 bg-realm/50 border border-magic/30 hover:border-magic/60 transition disabled:opacity-40">Share clip</button>
             <button onClick={downloadClip} disabled={!clip || !clip.blob} className="px-4 py-2.5 rounded-xl font-semibold text-ink/90 bg-realm/50 border border-magic/30 hover:border-magic/60 transition disabled:opacity-40">Download clip</button>
             <button onClick={shareCard} className="px-4 py-2.5 rounded-xl font-semibold text-ink/90 bg-realm/50 border border-magic/30 hover:border-magic/60 transition">Share image</button>
+            <button onClick={() => setShowBoard(true)} className="px-4 py-2.5 rounded-xl font-semibold text-gold/90 bg-realm/50 border border-gold/30 hover:border-gold/60 transition">Ranks</button>
             {onExit && <button onClick={onExit} className="px-4 py-2.5 rounded-xl font-semibold text-ink/80 bg-realm/50 border border-magic/30 hover:border-magic/60 transition">Back</button>}
           </div>
 
