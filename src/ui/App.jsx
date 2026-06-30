@@ -12,6 +12,7 @@ import { DEFAULT_DURATION, DEFAULT_BODYWEIGHT_KG } from '../config/game.config.j
 import { DEFAULT_AVATAR_ID } from '../config/avatars.js';
 import DinoSurvival from '../games/dino-survival/index.js';
 import Keeper from '../games/keeper/index.js';
+import TempleDash from '../games/temple/index.js';
 import Home from './screens/Home.jsx';
 import LeaderboardPage from './screens/LeaderboardPage.jsx';
 import { track } from '../analytics/ga.js';
@@ -64,7 +65,7 @@ export default function App() {
   const pick = (g) => {
     // GA: one event per launch tagged with the game id, so the Events report
     // ranks which game is played most. (Orientation handled by the native wrapper.)
-    track('game_start', { game_id: g, game_name: g === 'dino' ? 'Dino Survival' : g === 'keeper' ? 'Keeper' : 'Monster Punch' });
+    track('game_start', { game_id: g, game_name: g === 'dino' ? 'Dino Survival' : g === 'keeper' ? 'Keeper' : g === 'temple' ? 'Temple Dash' : 'Monster Punch' });
     go(routeForGame(g).path);
   };
   const goHome = () => go('/');
@@ -82,6 +83,7 @@ export default function App() {
     <>
       {route.game === 'dino' ? <DinoSurvival onExit={goHome} />
         : route.game === 'keeper' ? <Keeper onExit={goHome} />
+        : route.game === 'temple' ? <TempleDash onExit={goHome} />
         : route.game === 'demon' ? <DemonRealm />
         : <Home onPlay={pick} onOpenLeaderboard={openLeaderboard} />}
     </>

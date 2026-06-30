@@ -20,6 +20,9 @@ const GAMES = [
   { id: 'keeper', title: 'Keeper', meta: 'Reflexes & agility · goalkeeping',
     desc: 'Your body fills the goal — reach and dive to save shots that get faster and swervier each level.',
     img: '/assets/keeper/tile.png' },
+  // Temple Dash is NOT shown on the home page — it is a keyboard 3D runner, not a
+  // webcam/AR game, so it doesn't belong in the SlayFit AR-games grid. It stays
+  // reachable directly at /temple-dash (App route + SEO), just not advertised here.
 ];
 
 // Contact — set this to Udit's X handle (without the @). Used in the footer.

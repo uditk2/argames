@@ -95,6 +95,22 @@ export const ROUTES = [
       </main>`,
   },
   {
+    path: '/temple-dash',
+    game: 'temple',
+    title: 'Temple Dash — Free No-Download 3D Temple Runner | SlayFit',
+    description:
+      'Temple Dash is a free, no-download 3D temple runner you play in your browser. Sprint through a collapsing temple ahead of a rolling boulder — turn the corners, jump the stone beams and duck the swinging blades. Instant, no install.',
+    body: `<main>
+        <h1>Temple Dash — 3D Temple Runner You Can Play Today</h1>
+        <p>Temple Dash is a free, no-download <strong>3D temple runner</strong> you can play right now in your browser. You sprint through a dark, photoreal temple with a giant boulder rolling at your heels — read the corridor ahead, turn the right way at every wall, jump the low stone beams and duck the swinging blades. Miss one and the boulder catches you. It is an endless, reflex-driven runner built entirely from real-time 3D, no install required.</p>
+        <h2>Play the 3D temple runner today — no download</h2>
+        <p>There is nothing to install. Open the page and run — Temple Dash is one of SlayFit's free no-download games: instant, fast and easy to share. Use the arrow keys on desktop or the on-screen buttons on mobile.</p>
+        <h2>How to play</h2>
+        <p>Use ← / → to turn the corners, ↑ to jump the stone beams, and ↓ to duck the swinging blades. Keep clearing hazards to stay ahead of the boulder and push your distance higher each run.</p>
+        <p>Part of <a href="/">SlayFit free no-download games</a> · also try <a href="/keeper">Keeper</a> and <a href="/dino-survival">Dino Survival</a>.</p>
+      </main>`,
+  },
+  {
     path: '/leaderboard',
     game: null,
     view: 'leaderboard',
