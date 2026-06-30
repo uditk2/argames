@@ -43,8 +43,14 @@ const BRAND = { wordmark: 'SLAYFIT', descriptor: 'webcam workout brawler' };
 
 // Every glyph the card can render — lets Google return a small subsetted TTF
 // (Satori needs ttf/otf/woff, NOT woff2) and keeps the fetch tiny.
+// Includes '%' (save-rate / distance cards) and 's' so EVERY glyph any card can
+// render is already here — letting all cards request the SAME fixed subset, which
+// keeps the Google Fonts response URL STABLE and edge/CDN-cacheable. Appending a
+// per-score string here (the old `extra`) made the font URL unique per result, so
+// every distinct card paid full cold-start font latency (→ crawler timeout → no
+// preview image). Keep this superset stable; do NOT append dynamic text below.
 const CHARSET =
-  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ,.:×·!?'—-";
+  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789 ,.:%×·!?'—-";
 
 /** Fetch a Google font as an ArrayBuffer (truetype, subsetted to `text`). */
 async function loadGoogleFont(family, weight, text) {
@@ -112,8 +118,9 @@ async function dinoImage(searchParams) {
   const pct = intParam(searchParams.get('pct'));
   const big = escaped ? `${timeS.toFixed(1)}s` : `${pct}%`;
   const accent = escaped ? C.gold : C.fire;
+  // Fixed CHARSET (covers digits/%/s) → stable, cacheable Google Fonts URLs.
   const [cinzel, fredoka] = await Promise.all([
-    loadGoogleFont('Cinzel Decorative', 900, `${CHARSET}${big}`),
+    loadGoogleFont('Cinzel Decorative', 900, CHARSET),
     loadGoogleFont('Fredoka', 600, CHARSET),
   ]);
   const tree = h(
@@ -183,11 +190,12 @@ async function keeperImage(searchParams) {
   const reached = lvls + 1;
   const big = groupInt(lvls);
   const accent = C.gold;
-  // include every glyph the chips render (digits, '%', shots count) in the subset.
-  const extra = `${big}${pct}%${shots}${saves}${reached}`;
+  // Fixed CHARSET already covers every glyph the chips render (digits, '%').
+  // Using it verbatim keeps the Google Fonts URLs stable + edge-cacheable, so a
+  // cold render can't stall long enough for the social crawler to drop the image.
   const [cinzel, fredoka] = await Promise.all([
-    loadGoogleFont('Cinzel Decorative', 900, `${CHARSET}${extra}`),
-    loadGoogleFont('Fredoka', 600, `${CHARSET}${extra}`),
+    loadGoogleFont('Cinzel Decorative', 900, CHARSET),
+    loadGoogleFont('Fredoka', 600, CHARSET),
   ]);
   const tree = h(
     'div',
@@ -259,8 +267,9 @@ export default async function handler(req) {
     const combo = comboRaw != null ? intParam(comboRaw, null) : null;
 
     const scoreText = groupInt(score);
+    // Fixed CHARSET (digits + ',') → stable, cacheable Google Fonts URLs.
     const [cinzel, fredoka] = await Promise.all([
-      loadGoogleFont('Cinzel Decorative', 900, `${CHARSET}${scoreText}${slain}${kcal}`),
+      loadGoogleFont('Cinzel Decorative', 900, CHARSET),
       loadGoogleFont('Fredoka', 600, CHARSET),
     ]);
 
