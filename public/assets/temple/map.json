@@ -1,0 +1,21 @@
+{
+  "name": "Temple Dash — Level 1",
+  "params": {
+    "hallWidth": 12,
+    "hallHeight": 7,
+    "hallLen": 22,
+    "exitLen": 18,
+    "runSpeed": 9,
+    "startGrace": 8
+  },
+  "segments": [
+    { "turn": "R", "len": 34, "hazards": [ { "type": "beam", "at": 0.62 } ] },
+    { "turn": "L", "hazards": [ { "type": "blade", "at": 0.5 } ] },
+    { "turn": "L", "hazards": [ { "type": "beam", "at": 0.4 }, { "type": "blade", "at": 0.72 } ] },
+    { "turn": "R", "hazards": [ { "type": "blade", "at": 0.5 } ] },
+    { "turn": "R", "hazards": [ { "type": "beam", "at": 0.5 } ] },
+    { "turn": "L", "hazards": [ { "type": "beam", "at": 0.4 } ] },
+    { "turn": "R", "hazards": [ { "type": "blade", "at": 0.55 } ] },
+    { "turn": "L", "hazards": [ { "type": "beam", "at": 0.5 }, { "type": "blade", "at": 0.75 } ] }
+  ]
+}

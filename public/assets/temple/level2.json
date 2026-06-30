@@ -1,0 +1,24 @@
+{
+  "name": "Temple Dash — Level 2: Bladeworks",
+  "mode": "maze",
+  "params": {
+    "hallWidth": 12,
+    "hallHeight": 7,
+    "hallLen": 22,
+    "exitLen": 18,
+    "runSpeed": 9,
+    "startGrace": 6,
+    "collapseTime": 80
+  },
+  "junctions": [
+    { "correct": "R", "len": 30, "hazards": [ { "type": "beam", "at": 0.6 } ] },
+    { "correct": "R", "len": 22, "hazards": [ { "type": "fire", "mode": "jump", "at": 0.55 } ] },
+    { "correct": "L", "len": 26, "hazards": [ { "type": "beam", "at": 0.35 }, { "type": "blade", "at": 0.7 } ] },
+    { "correct": "L", "len": 20, "hazards": [ { "type": "fire", "mode": "duck", "at": 0.5 } ] },
+    { "correct": "R", "len": 24, "hazards": [ { "type": "crack", "at": 0.5 } ] },
+    { "correct": "L", "len": 28, "hazards": [ { "type": "beam", "at": 0.3 }, { "type": "blade", "at": 0.72 } ] },
+    { "correct": "R", "len": 22, "hazards": [ { "type": "fire", "mode": "duck", "at": 0.55 } ] },
+    { "correct": "R", "len": 24, "hazards": [ { "type": "fire", "mode": "jump", "at": 0.35 }, { "type": "crack", "at": 0.7 } ] },
+    { "correct": "L", "len": 26, "hazards": [ { "type": "beam", "at": 0.32 }, { "type": "blade", "at": 0.74 } ] }
+  ]
+}

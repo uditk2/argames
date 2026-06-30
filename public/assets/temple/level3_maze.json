@@ -1,0 +1,28 @@
+{
+  "name": "Temple Dash — Level 3: The Labyrinth",
+  "mode": "maze",
+  "params": {
+    "hallWidth": 12,
+    "hallHeight": 7,
+    "hallLen": 18,
+    "exitLen": 18,
+    "runSpeed": 11,
+    "startGrace": 5,
+    "collapseTime": 78
+  },
+  "junctions": [
+    { "correct": "L", "len": 24, "hazards": [ { "type": "beam", "at": 0.55 } ] },
+    { "correct": "L", "len": 16, "hazards": [ { "type": "blade", "at": 0.5 } ] },
+    { "correct": "R", "len": 26, "hazards": [ { "type": "beam", "at": 0.3 }, { "type": "fire", "mode": "duck", "at": 0.68 } ] },
+    { "correct": "R", "len": 20, "hazards": [ { "type": "crack", "at": 0.45 } ] },
+    { "correct": "L", "len": 22, "hazards": [ { "type": "fire", "mode": "jump", "at": 0.35 }, { "type": "blade", "at": 0.7 } ] },
+    { "correct": "R", "len": 16, "hazards": [ { "type": "fire", "mode": "duck", "at": 0.55 } ] },
+    { "correct": "R", "len": 24, "hazards": [ { "type": "beam", "at": 0.28 }, { "type": "crack", "at": 0.66 } ] },
+    { "correct": "L", "len": 18, "hazards": [ { "type": "blade", "at": 0.5 } ] },
+    { "correct": "L", "len": 22, "hazards": [ { "type": "beam", "at": 0.32 }, { "type": "blade", "at": 0.72 } ] },
+    { "correct": "R", "len": 16, "hazards": [ { "type": "blade", "at": 0.5 } ] },
+    { "correct": "L", "len": 24, "hazards": [ { "type": "beam", "at": 0.3 }, { "type": "blade", "at": 0.7 } ] },
+    { "correct": "R", "len": 20, "hazards": [ { "type": "beam", "at": 0.5 } ] },
+    { "correct": "R", "len": 22, "hazards": [ { "type": "beam", "at": 0.3 }, { "type": "blade", "at": 0.72 } ] }
+  ]
+}

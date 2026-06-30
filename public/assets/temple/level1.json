@@ -1,0 +1,18 @@
+{
+  "name": "Temple Dash — Level 1: The Long Hall",
+  "mode": "maze",
+  "params": {
+    "hallWidth": 12,
+    "hallHeight": 7,
+    "hallLen": 22,
+    "exitLen": 18,
+    "runSpeed": 8,
+    "startGrace": 10,
+    "collapseTime": 85
+  },
+  "junctions": [
+    { "correct": "R", "len": 38, "hazards": [ { "type": "beam", "at": 0.45 }, { "type": "fire", "mode": "jump", "at": 0.72 } ] },
+    { "correct": "R", "len": 36, "hazards": [ { "type": "blade", "at": 0.4 }, { "type": "fire", "mode": "duck", "at": 0.68 } ] },
+    { "correct": "L", "len": 34, "hazards": [ { "type": "crack", "at": 0.5 } ] }
+  ]
+}
