@@ -433,18 +433,25 @@ function CollapseTimer({ timeLeft, urgent }) {
   );
 }
 
-// Lives as three ▲ icons (filled = remaining, dim = lost).
+// Lives as ankh life-tokens (full glowing gold = remaining, cracked stone = lost).
 function LivesRow({ lives }) {
   return (
     <div className="flex items-center justify-center gap-1.5 mt-1">
-      {Array.from({ length: START_LIVES }).map((_, i) => (
-        <span key={i} className="text-[18px] leading-none"
-          style={{
-            color: i < lives ? '#ff5a3c' : '#5a3a2a',
-            textShadow: i < lives ? '0 0 8px #ff5a3c88' : 'none',
-            opacity: i < lives ? 1 : 0.5,
-          }}>▲</span>
-      ))}
+      {Array.from({ length: START_LIVES }).map((_, i) => {
+        const alive = i < lives;
+        return (
+          <img
+            key={i}
+            src={alive ? '/assets/temple/life_full.png' : '/assets/temple/life_lost.png'}
+            alt={alive ? 'life' : 'life lost'}
+            width={20}
+            height={20}
+            className="select-none"
+            draggable={false}
+            style={{ opacity: alive ? 1 : 0.85 }}
+          />
+        );
+      })}
     </div>
   );
 }
