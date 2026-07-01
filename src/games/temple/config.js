@@ -137,8 +137,9 @@ export const AVATAR = {
 // the on-screen RUN button; later: run-in-place via webcam cadence). Stopping lets
 // the player read the maze and choose a turn deliberately. The collapse timer keeps
 // draining, so dawdling still costs you. When OFF, the classic auto-run is used.
-// This is the default; the intro screen toggles it (auto-run stays a fallback).
-export const RUN_TO_MOVE = true;
+// OFF by default so the runner auto-runs (easier to pick up); the intro toggles it ON
+// for the deliberate "you set the pace" mode (and it's the webcam run-in-place control).
+export const RUN_TO_MOVE = false;
 
 // Gameplay windows / pacing (ported from the prototype tunables).
 export const PLAY = {

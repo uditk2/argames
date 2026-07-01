@@ -74,6 +74,26 @@ export default function TempleDash({ onExit }) {
     const e = engRef.current; if (e) e.input(action);
   }, []);
 
+  // ---- TOUCH SWIPE CONTROLS (mobile) -----------------------------------------
+  // The natural runner control: swipe ↑ = jump, ↓ = duck, ←/→ = turn, and a quick
+  // TAP = jump. Only active during play; ignores touches that begin on a button/HUD.
+  const touchRef = useRef(null);
+  const onTouchStart = useCallback((e) => {
+    if (screen !== 'playing') return;
+    if (e.target.closest && e.target.closest('button')) { touchRef.current = null; return; }
+    const t = e.touches[0]; touchRef.current = { x: t.clientX, y: t.clientY, t: Date.now() };
+  }, [screen]);
+  const onTouchEnd = useCallback((e) => {
+    const s = touchRef.current; touchRef.current = null;
+    if (!s || screen !== 'playing') return;   // engine ignores actions during over/won
+    const t = e.changedTouches[0];
+    const dx = t.clientX - s.x, dy = t.clientY - s.y;
+    const ax = Math.abs(dx), ay = Math.abs(dy), TH = 26;
+    if (ax < TH && ay < TH) { sendInput('jump'); return; }     // tap = jump
+    if (ax > ay) sendInput(dx > 0 ? 'right' : 'left');         // horizontal swipe = turn
+    else sendInput(dy > 0 ? 'duck' : 'jump');                  // down = duck, up = jump
+  }, [screen, sendInput]);
+
   // ---------------------------------------------------------------------------
   // loadLevel(idx) — the ONE place that (re)creates the engine. Tears down any
   // existing run, fetches LEVELS[idx].map, and wires the canvases + handlers.
@@ -95,7 +115,9 @@ export default function TempleDash({ onExit }) {
       fxCanvas: fxRef.current,
       minimapCanvas: mmRef.current,
       map,
-      runToMove: runToMoveRef.current,
+      // On phones the player reacts with SWIPES, so auto-run (holding a RUN button while
+      // swiping is awkward). Run-to-move (hold) stays for desktop/webcam.
+      runToMove: IS_PHONE ? false : runToMoveRef.current,
       onCue: (text, color) => flashCue(text, color),
       onState: (st) => {
         setHud(st);
@@ -173,8 +195,24 @@ export default function TempleDash({ onExit }) {
     }
   }, [over, won, lives, isLastLevel, retryLevel, restartCampaign, nextLevel, sendInput]);
 
+  // Desktop: let keyboard players start the dash with Space/Enter (no mouse needed).
+  // Skip when a <details>/<summary> or button is focused so those keys still toggle/activate.
+  useEffect(() => {
+    if (screen !== 'intro' || IS_PHONE) return;
+    const onKey = (e) => {
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      const tag = (e.target && e.target.tagName) || '';
+      if (tag === 'SUMMARY' || tag === 'BUTTON' || tag === 'A') return;
+      e.preventDefault();
+      startCampaign(0);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [screen, startCampaign]);
+
   return (
-    <div className="fixed inset-0 overflow-hidden bg-black text-[#ffe9c8] font-body select-none">
+    <div className="fixed inset-0 overflow-hidden bg-black text-[#ffe9c8] font-body select-none"
+      onTouchStart={onTouchStart} onTouchEnd={onTouchEnd} style={{ touchAction: 'none' }}>
       {/* 3D scene */}
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block" />
       {/* 2D boulder / vignette overlay */}
@@ -190,11 +228,11 @@ export default function TempleDash({ onExit }) {
         <>
           {/* minimap — a carved stone maze inside an ornate gold temple frame. FADES OUT
               on death/escape so it doesn't add to the void read during the overlay. */}
-          <div className="absolute top-[58px] right-3 z-[4] transition-opacity duration-500"
-            style={{ width: 176, height: 176, opacity: ended ? 0 : 1 }}>
+          <div className="absolute top-[52px] right-2.5 z-[4] transition-opacity duration-500"
+            style={{ width: IS_PHONE ? 132 : 176, height: IS_PHONE ? 132 : 176, opacity: ended ? 0 : 1 }}>
             <canvas ref={mmRef} width={150} height={150}
               className="absolute rounded-md"
-              style={{ left: 24, top: 24, width: 128, height: 128, background: 'radial-gradient(circle at 50% 42%, #241910 0%, #110b06 100%)' }} />
+              style={{ left: '13.6%', top: '13.6%', width: '72.7%', height: '72.7%', background: 'radial-gradient(circle at 50% 42%, #241910 0%, #110b06 100%)' }} />
             <img src="/assets/temple/map_frame.png" alt="" aria-hidden="true"
               className="absolute inset-0 w-full h-full pointer-events-none select-none"
               style={{ filter: 'drop-shadow(0 2px 7px rgba(0,0,0,0.55))' }} />
@@ -235,22 +273,15 @@ export default function TempleDash({ onExit }) {
           {/* desktop controls hint */}
           {!IS_PHONE && !ended && (
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[4] text-[12px]" style={{ color: '#d9b98a', textShadow: '0 1px 3px #000' }}>
-              {runToMove ? 'HOLD ⇧ Shift to run · ' : ''}← / → turn · ↑ jump beams, low fire & gaps · ↓ duck blades & high fire · beat the clock
+              ← → turn · ↑ jump · ↓ duck · beat the clock
             </div>
           )}
 
-          {/* mobile on-screen buttons */}
+          {/* mobile: SWIPE controls (no buttons) — a subtle hint, fades with the cues */}
           {IS_PHONE && !ended && (
-            <div className="absolute bottom-4 inset-x-0 z-[7] flex items-center justify-between px-5 pointer-events-none">
-              <div className="flex flex-col gap-3 items-start">
-                <TButton label="◄" onPress={() => sendInput('left')} />
-                {runToMove && <THoldButton label="RUN" onStart={() => sendInput('runStart')} onStop={() => sendInput('runStop')} />}
-              </div>
-              <div className="flex flex-col gap-3">
-                <TButton label="▲ JUMP" onPress={() => sendInput('jump')} />
-                <TButton label="▼ DUCK" onPress={() => sendInput('duck')} />
-              </div>
-              <TButton label="►" onPress={() => sendInput('right')} />
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-[4] text-[11px] text-center pointer-events-none px-4"
+              style={{ color: '#d9b98a', textShadow: '0 1px 3px #000' }}>
+              swipe&nbsp; ↑ jump&nbsp; ↓ duck&nbsp; ← → turn&nbsp; · tap to jump
             </div>
           )}
 
@@ -299,39 +330,41 @@ export default function TempleDash({ onExit }) {
           <div className="panel p-6 w-[min(96vw,520px)] text-center">
             <div className="font-display font-black text-3xl bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">TEMPLE DASH</div>
             <div className="text-[11px] tracking-[0.24em] mt-1 uppercase mb-3" style={{ color: '#ffb454' }}>Run · Turn · Survive</div>
-            <p className="text-ink/75 text-[13px] leading-relaxed">
-              Sprint through a collapsing temple with a boulder on your heels.
-              Read the path: <b className="text-ink">jump</b> the fallen beams, low fire jets and broken-floor gaps, <b className="text-ink">duck</b> the swinging blades and high fire jets, and <b className="text-ink">turn</b> at the corners — a blade or fire is instant death, and miss a turn and you run off the edge into the pit. Don't dawdle: the temple is collapsing.
-            </p>
-            <p className="text-ink/60 text-[12px] mt-2">
-              A {LEVELS.length}-level campaign with <b className="text-ink/85">3 shared lives</b>.
+            {/* one-line goal — the only sentence (players skim, not read; NN/G) */}
+            <p className="text-ink/80 text-[13px] leading-snug mb-5 px-2">
+              Dodge the traps and take the right turns to reach the exit before the temple falls.
             </p>
 
-            {/* visual controls — keycaps (arrows or WASD) */}
-            <div className="my-5 grid grid-cols-3 gap-2.5">
-              <ControlCard caps={['↑', 'W']} label="JUMP" sub="the beams" />
-              <ControlCard caps={['↓', 'S']} label="DUCK" sub="the blades" />
-              <ControlCard caps={['← →', 'A D']} label="TURN" sub="the corners" />
-            </div>
-            <div className="text-[11px] text-ink/55 mb-3">Arrow keys or <b className="text-ink/80">WASD</b> · Space also jumps · on phone, tap the on-screen buttons</div>
+            {/* CONTROL LEGEND — visual + platform-specific (touch swipes vs keyboard keys) */}
+            {IS_PHONE ? (
+              <div className="grid grid-cols-3 gap-2.5 mb-2">
+                <GestureCard glyph="↑" label="JUMP" />
+                <GestureCard glyph="↓" label="DUCK" />
+                <GestureCard glyph="← →" label="TURN" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-3 gap-2.5 mb-2">
+                <ControlCard caps={['↑', 'W']} label="JUMP" sub="beams · fire · gaps" />
+                <ControlCard caps={['↓', 'S']} label="DUCK" sub="blades · high fire" />
+                <ControlCard caps={['← →', 'A D']} label="TURN" sub="read the map" />
+              </div>
+            )}
+            <div className="text-[11px] text-ink/50 mb-4">{IS_PHONE ? 'Swipe to move · tap to jump' : 'Arrow keys or WASD · Space also jumps'}</div>
 
-            {/* RUN-TO-MOVE toggle — you set the pace (effort = progress); off = classic auto-run. */}
-            <button onClick={() => setRunToMove((v) => !v)}
-              className="w-full mb-3 py-2.5 px-3 rounded-xl flex items-center justify-between text-[12px] transition"
-              style={{ background: 'rgba(28,19,11,0.6)', border: `1px solid ${runToMove ? '#ffce6b88' : '#ffffff1a'}` }}>
-              <span className="text-left">
-                <b className="text-ink/90">Run-to-move</b>
-                <span className="text-ink/55"> — you set the pace (hold ⇧ Shift / RUN). Off = auto-run.</span>
-              </span>
-              <span className="ml-2 font-black" style={{ color: runToMove ? '#ffce6b' : '#7a6a52' }}>{runToMove ? 'ON' : 'OFF'}</span>
-            </button>
+            {/* optional detail — collapsed by default (for the few who want the full rules) */}
+            <details className="mb-4 text-left rounded-xl overflow-hidden" style={{ background: 'rgba(28,19,11,0.5)', border: '1px solid #ffffff12' }}>
+              <summary className="text-[11px] uppercase tracking-[0.14em] cursor-pointer select-none px-3 py-2" style={{ color: '#ffb454' }}>How it works</summary>
+              <p className="text-[12px] text-ink/65 leading-relaxed px-3 pb-3">
+                Jump the fallen beams, low fire jets and floor gaps. Duck the swinging blades and high fire jets. At each junction, read the map (top-right) and turn the right way — wrong turns are dead ends you back out of. A blade or fire is instant death; falling in a gap or letting the collapse timer hit zero costs a life. {LEVELS.length} levels · 3 shared lives.
+              </p>
+            </details>
 
             <div className="space-y-2">
               <button onClick={() => startCampaign(0)}
-                className="w-full py-3 rounded-xl font-bold text-white bg-gradient-to-r from-fire to-magic shadow-glow-fire hover:brightness-110 transition">
-                Start the dash
+                className="w-full py-3.5 rounded-xl font-black text-white text-lg bg-gradient-to-r from-fire to-magic shadow-glow-fire hover:brightness-110 transition">
+                ▶ Play
               </button>
-              <div className="text-[11px] text-ink/45 pt-0.5">{LEVELS.length} levels · each tougher than the last · 3 shared lives</div>
+              <div className="text-[11px] text-ink/45 pt-0.5">{!IS_PHONE && 'Space / Enter to start · '}{LEVELS.length} levels · 3 shared lives</div>
 
               {onExit && (
                 <button onClick={onExit}
@@ -534,6 +567,20 @@ function ControlCard({ caps, label, sub }) {
       <div className="flex gap-1.5">{caps.map((c, i) => <KeyCap key={i}>{c}</KeyCap>)}</div>
       <div className="font-display font-black text-[15px]" style={{ color: '#ffb454' }}>{label}</div>
       <div className="text-[11px] text-ink/60">{sub}</div>
+    </div>
+  );
+}
+
+// Touch legend card — a swipe glyph (arrow) + verb, for the mobile intro.
+function GestureCard({ glyph, label }) {
+  return (
+    <div className="flex flex-col items-center gap-1.5 rounded-xl py-3 px-2"
+      style={{ background: 'rgba(28,19,11,0.55)', border: '1px solid #ffffff14' }}>
+      <div className="flex flex-col items-center leading-none">
+        <div className="text-[24px] font-black" style={{ color: '#ffd45a', textShadow: '0 0 10px rgba(255,180,60,0.5)' }}>{glyph}</div>
+        <div className="text-[8px] uppercase tracking-[0.16em] text-ink/45 mt-0.5">swipe</div>
+      </div>
+      <div className="font-display font-black text-[15px]" style={{ color: '#ffb454' }}>{label}</div>
     </div>
   );
 }
