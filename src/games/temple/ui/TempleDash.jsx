@@ -27,6 +27,11 @@ import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { ASSETS, RUN_TO_MOVE } from '../config.js';
 import { createTempleEngine } from '../engine/templeEngine.js';
 import { LEVELS } from '../levels.js';
+// CrazyGames SDK v3 wrapper — every call is a guarded no-op unless the
+// standalone build enables it (window.__CRAZYGAMES__ / VITE_CRAZYGAMES). The
+// normal portal build is byte-for-byte unaffected in behavior. See
+// ../crazygames/sdk.js.
+import * as CG from '../crazygames/sdk.js';
 
 const IS_PHONE = typeof navigator !== 'undefined' && /Mobi|Android|iPhone|iPod/i.test(navigator.userAgent || '');
 const START_LIVES = 3;
@@ -105,6 +110,7 @@ export default function TempleDash({ onExit }) {
     setScreen('playing');
     setHud({ distance: 0, clears: 0, phase: 'ready' });
     lastPhaseRef.current = 'ready';           // fresh level → next 'over' edge counts
+    CG.gameplayStart();                       // CrazyGames: a run/level begins (guarded no-op off-platform)
 
     const url = (LEVELS[idx] && LEVELS[idx].map) || ASSETS.map;
     let map = null;
@@ -124,6 +130,12 @@ export default function TempleDash({ onExit }) {
         // decrement once, on the transition INTO 'over' (edge-detected via ref).
         if (st.phase === 'over' && lastPhaseRef.current !== 'over') {
           setLives((l) => Math.max(0, l - 1));
+          CG.gameplayStop();   // CrazyGames: active play ended (death) — pause/allow ads.
+        }
+        // CrazyGames: also stop on the edge into 'won' (level clear / escape). The
+        // between-levels midgame ad is fired from nextLevel, AFTER this stop.
+        if (st.phase === 'won' && lastPhaseRef.current !== 'won') {
+          CG.gameplayStop();
         }
         lastPhaseRef.current = st.phase;
       },
@@ -172,15 +184,24 @@ export default function TempleDash({ onExit }) {
     sendInput('restart');
   }, [sendInput]);
 
-  const nextLevel = useCallback(() => {
+  const nextLevel = useCallback(async () => {
     const next = levelIndex + 1;
     setLevelIndex(next);
+    // CrazyGames: a compliant MIDGAME (interstitial) ad on the between-levels
+    // transition. gameplayStop() already fired on the 'won' edge, so no active
+    // play is interrupted. Awaitable + resolves even on adError/adblock, so the
+    // next level always loads. Guarded no-op off-platform → instant on the portal.
+    await CG.midgameAd();
     loadLevel(next);          // KEEP current lives
   }, [levelIndex, loadLevel]);
 
   const restartCampaign = useCallback(() => startCampaign(0), [startCampaign]);
 
-  const backToMenu = useCallback(() => { teardown(); onExit && onExit(); }, [teardown, onExit]);
+  const backToMenu = useCallback(() => {
+    CG.gameplayStop();   // CrazyGames: leaving an in-progress run to a menu ends active play.
+    teardown();
+    onExit && onExit();
+  }, [teardown, onExit]);
 
   // Enter-key target: the primary action of whichever end-panel is showing.
   // Held in a ref so the (stable) keydown handler always calls the latest one.

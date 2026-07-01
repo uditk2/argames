@@ -7,6 +7,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/prerender-routes.mjs",
+    "build:crazygames": "vite build --config vite.crazygames.config.js",
     "preview": "vite preview"
   },
   "dependencies": {

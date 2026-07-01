@@ -6,6 +6,10 @@ dist
 .env
 .env*.local
 
+# Standalone CrazyGames build artifacts (see vite.crazygames.config.js)
+dist-crazygames/
+temple-collapse-crazygames.zip
+
 # Standalone "Grotto" demo build artifacts (see scripts/build-grotto-demo.sh)
 dist-grotto/
 dino-survival-grotto.zip
