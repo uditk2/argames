@@ -653,7 +653,11 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
     deathCause = null; stuckT = 0; sliceT = 0; winT = 0; fallT = 0; falling = false;
     dir = 1; mazeWall = false; backing = false; camBlend = 0; rigInit = false;
     collapseArmed = false; collapse.reset();
-    boulderGone = false; presence = 1; boulderDropped = false;
+    // BOULDER RETIRED (Temple Collapse): the chase boulder is fully removed — the
+    // collapse timer is the pressure now. Initialize as if the boulder is already
+    // gone/dropped so it never renders (overlay alpha 0), the crush cinematic never
+    // plays, and every death routes through the plain non-boulder fade/impact path.
+    boulderGone = true; presence = 0; boulderDropped = true;
     hop = 0; dip = 0; hopV = 0; dipV = 0; anim = 'run'; animT = 0; animFrame = 0; runT = 0;
     turnLean = 0; turnLeanV = 0;
     beamDone.fill(false); bladeDone.fill(false); turnDone.fill(false); turnArmed.fill(false);
