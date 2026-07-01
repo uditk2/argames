@@ -491,6 +491,14 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
   const mx = minimapCanvas ? minimapCanvas.getContext('2d') : null;
   const mmBounds = route.mmBounds;
   const mazeSegments = route.mazeSegments;
+  // Hazard map-anchors (world x/z of every placed trap) so the minimap can drop
+  // legend icons on the maze — beams, blades, fire jets and crumbling floor.
+  const mmHazards = {
+    beam: beamPts.map((p) => ({ x: p.x, z: p.z })),
+    blade: bladePts.map((p) => ({ x: p.x, z: p.z })),
+    fire: firePts.map((f) => ({ x: f.p.x, z: f.p.z })),
+    crack: crackPts.map((p) => ({ x: p.x, z: p.z })),
+  };
   function drawMM(sv) {
     if (!mx) return;
     const clampS = (v) => Math.max(0.1, Math.min(route.total - 0.1, v));
@@ -498,7 +506,7 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
     const p0 = ptAt(aS), p1 = ptAt(clampS(aS + dir * 1.6));
     drawMinimap(mx, {
       canvas: minimapCanvas, maze: MAZE, bounds: mmBounds,
-      waypoints: route.waypoints, correctWaypoints, junctionStubs, mazeSegments,
+      waypoints: route.waypoints, correctWaypoints, junctionStubs, mazeSegments, hazards: mmHazards,
       // the dot tracks the AVATAR (sv + the in-travel-direction lead), so it follows a
       // wrong-branch excursion and the back-out, matching what the player sees.
       pos: p0,

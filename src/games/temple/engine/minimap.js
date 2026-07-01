@@ -1,10 +1,12 @@
 // ===========================================================================
-// Temple Dash — minimap rendering (styled stone-maze HUD).
+// Temple Collapse — minimap rendering (styled stone-maze HUD).
 // ---------------------------------------------------------------------------
 // Pure 2D rendering, NO game-state mutation. Renders the maze like a carved
-// stone map: embossed sandstone corridors, a glowing GOLD route to the exit,
-// dim dead-end branches, an EXIT archway marker and a glowing arrow for the
-// player. (An ornate frame PNG is overlaid around the canvas by the React HUD.)
+// treasure map: warm parchment wash, embossed sandstone corridors, a glowing
+// GOLD EXIT archway, a green START marker, red-X DEAD ENDS at each dead-end
+// stub, and legend icons for every trap (beam / blade / fire / crumbling
+// floor). A glowing arrow marks the player. (An ornate frame PNG is overlaid
+// around the canvas by the React HUD.)
 // ===========================================================================
 
 function polyline(ctx, pts, tx, tz) {
@@ -29,6 +31,26 @@ function tileSeams(ctx, segs, tx, tz, step) {
       }
     }
   });
+}
+
+// warm aged-paper wash behind the corridors so the empty space reads as a
+// treasure map rather than a black box.
+function parchmentFill(ctx, MM) {
+  const g = ctx.createRadialGradient(MM * 0.5, MM * 0.44, MM * 0.08, MM * 0.5, MM * 0.5, MM * 0.72);
+  g.addColorStop(0, 'rgba(74,54,31,0.42)');
+  g.addColorStop(1, 'rgba(28,18,9,0.55)');
+  ctx.fillStyle = g;
+  ctx.fillRect(0, 0, MM, MM);
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
 }
 
 function drawExit(ctx, x, y) {
@@ -63,6 +85,18 @@ function drawExit(ctx, x, y) {
   ctx.restore();
 }
 
+// green "you started here" disc (matches the treasure-map START marker).
+function drawStart(ctx, x, y) {
+  ctx.save();
+  ctx.shadowColor = 'rgba(120,235,120,0.9)'; ctx.shadowBlur = 8;
+  ctx.fillStyle = '#7ef07e';
+  ctx.beginPath(); ctx.arc(x, y, 5, 0, 7); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.fillStyle = '#122a0c';
+  ctx.beginPath(); ctx.arc(x, y, 2.3, 0, 7); ctx.fill();
+  ctx.restore();
+}
+
 function drawArrow(ctx, x, y, heading) {
   const ang = Math.atan2(heading ? heading.z : 0, heading ? heading.x : 1);
   ctx.save();
@@ -77,13 +111,81 @@ function drawArrow(ctx, x, y, heading) {
   ctx.restore();
 }
 
+// red X at a dead-end (matches the treasure-map "DEAD END" legend).
+function drawDeadEnd(ctx, x, y, r) {
+  ctx.save();
+  ctx.strokeStyle = '#e5493a'; ctx.lineWidth = 2; ctx.lineCap = 'round';
+  ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 2;
+  ctx.beginPath();
+  ctx.moveTo(x - r, y - r); ctx.lineTo(x + r, y + r);
+  ctx.moveTo(x + r, y - r); ctx.lineTo(x - r, y + r);
+  ctx.stroke();
+  ctx.restore();
+}
+
+// dark parchment chip behind a trap icon so it reads on the busy stone.
+function hazChip(ctx, x, y, r) {
+  ctx.fillStyle = 'rgba(18,11,5,0.6)';
+  ctx.beginPath(); ctx.arc(x, y, r + 1.6, 0, 7); ctx.fill();
+}
+
+function drawFire(ctx, x, y, r) {
+  hazChip(ctx, x, y, r);
+  ctx.save();
+  ctx.shadowColor = 'rgba(255,140,40,0.95)'; ctx.shadowBlur = 6;
+  const g = ctx.createLinearGradient(x, y + r, x, y - r);
+  g.addColorStop(0, '#ff6a12'); g.addColorStop(1, '#ffd23c');
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.moveTo(x, y - r);
+  ctx.quadraticCurveTo(x + r, y - r * 0.1, x, y + r);
+  ctx.quadraticCurveTo(x - r, y - r * 0.1, x, y - r);
+  ctx.fill();
+  ctx.restore();
+}
+
+function drawBlade(ctx, x, y, r) {
+  hazChip(ctx, x, y, r);
+  ctx.save();
+  ctx.fillStyle = '#d3dae0'; ctx.strokeStyle = '#5f656d'; ctx.lineWidth = 0.8;
+  ctx.beginPath();
+  ctx.moveTo(x, y - r); ctx.lineTo(x + r, y); ctx.lineTo(x, y + r); ctx.lineTo(x - r, y);
+  ctx.closePath(); ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
+function drawBeam(ctx, x, y, r) {
+  hazChip(ctx, x, y, r);
+  ctx.save();
+  ctx.fillStyle = '#e2a44c'; ctx.strokeStyle = '#7a5220'; ctx.lineWidth = 0.7;
+  roundRect(ctx, x - r, y - r * 0.42, r * 2, r * 0.84, 1.4);
+  ctx.fill(); ctx.stroke();
+  ctx.restore();
+}
+
+function drawCrack(ctx, x, y, r) {
+  hazChip(ctx, x, y, r);
+  ctx.save();
+  ctx.strokeStyle = '#0e0904'; ctx.lineWidth = 1.7; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+  ctx.beginPath();
+  ctx.moveTo(x - r, y - r * 0.5);
+  ctx.lineTo(x - r * 0.25, y);
+  ctx.lineTo(x + r * 0.25, y - r * 0.45);
+  ctx.lineTo(x + r, y + r * 0.55);
+  ctx.stroke();
+  ctx.restore();
+}
+
+const HAZ_DRAW = { beam: drawBeam, blade: drawBlade, fire: drawFire, crack: drawCrack };
+
 export function drawMinimap(ctx, {
-  canvas, maze, bounds, waypoints, correctWaypoints, junctionStubs, mazeSegments, pos, heading,
+  canvas, maze, bounds, waypoints, correctWaypoints, junctionStubs, mazeSegments, hazards, pos, heading,
 }) {
   if (!ctx) return;
   const { minx, maxx, minz, maxz } = bounds;
   const MM = canvas.width;
   ctx.clearRect(0, 0, MM, MM);
+  parchmentFill(ctx, MM);
   const pad = 18, sc = Math.min((MM - 2 * pad) / ((maxx - minx) || 1), (MM - 2 * pad) / ((maxz - minz) || 1));
   const tx = (x) => pad + (x - minx) * sc, tz = (z) => pad + (z - minz) * sc;
   ctx.lineCap = 'round'; ctx.lineJoin = 'round';
@@ -104,11 +206,28 @@ export function drawMinimap(ctx, {
   // 2) mortar seams (tiled-block read).
   tileSeams(ctx, segs, tx, tz, CW * 1.05);
 
-  // 3) EVERY corridor is drawn the SAME (no highlighted "solution" route) — the player
-  //    reads the map and decides the way themselves. Only the EXIT and the player are
-  //    marked: a glowing gold ARCHWAY at the goal, and the player ARROW for "you are here".
+  // 3) DEAD ENDS: a red X capping each dim dead-end stub (the wrong turns).
+  const iconR = Math.max(3.2, MM * 0.03);
+  if (junctionStubs && junctionStubs.length) {
+    junctionStubs.forEach((st) => {
+      if (st && st.length) { const e = st[st.length - 1]; drawDeadEnd(ctx, tx(e.x), tz(e.z), iconR); }
+    });
+  }
+
+  // 4) TRAP ICONS: drop a legend icon on every placed hazard along the route
+  //    (crack first, then beam/blade/fire so the brighter icons sit on top).
+  if (hazards) {
+    ['crack', 'beam', 'blade', 'fire'].forEach((kind) => {
+      const draw = HAZ_DRAW[kind]; const list = hazards[kind];
+      if (draw && list) list.forEach((h) => draw(ctx, tx(h.x), tz(h.z), iconR));
+    });
+  }
+
+  // 5) EXIT archway, START disc, and the player arrow ("you are here").
   const ex = (routeWP && routeWP.length) ? routeWP[routeWP.length - 1] : null;
   if (ex) drawExit(ctx, tx(ex.x), tz(ex.z));
+  const st0 = (routeWP && routeWP.length) ? routeWP[0] : null;
+  if (st0) drawStart(ctx, tx(st0.x), tz(st0.z));
   drawArrow(ctx, tx(pos.x), tz(pos.z), heading);
 }
 
