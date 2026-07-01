@@ -95,18 +95,18 @@ export const ROUTES = [
       </main>`,
   },
   {
-    path: '/temple-dash',
+    path: '/temple-collapse',
     game: 'temple',
-    title: 'Temple Dash — Free No-Download 3D Temple Runner | SlayFit',
+    title: 'Temple Collapse: Maze Escape — Free 3D Temple Maze Runner | SlayFit',
     description:
-      'Temple Dash is a free, no-download 3D temple runner you play in your browser. Sprint through a collapsing temple ahead of a rolling boulder — turn the corners, jump the stone beams and duck the swinging blades. Instant, no install.',
+      'Temple Collapse is a free, no-download 3D maze runner. Escape a collapsing temple before it comes down — read the maze, take the right turns, jump the beams, fire jets and floor gaps, and duck the swinging blades. Play instantly in your browser, no install.',
     body: `<main>
-        <h1>Temple Dash — 3D Temple Runner You Can Play Today</h1>
-        <p>Temple Dash is a free, no-download <strong>3D temple runner</strong> you can play right now in your browser. You sprint through a dark, photoreal temple with a giant boulder rolling at your heels — read the corridor ahead, turn the right way at every wall, jump the low stone beams and duck the swinging blades. Miss one and the boulder catches you. It is an endless, reflex-driven runner built entirely from real-time 3D, no install required.</p>
-        <h2>Play the 3D temple runner today — no download</h2>
-        <p>There is nothing to install. Open the page and run — Temple Dash is one of SlayFit's free no-download games: instant, fast and easy to share. Use the arrow keys on desktop or the on-screen buttons on mobile.</p>
+        <h1>Temple Collapse: Maze Escape — 3D Temple Maze Runner You Can Play Today</h1>
+        <p>Temple Collapse is a free, no-download <strong>3D maze runner</strong> you can play right now in your browser. You sprint through a dark, photoreal temple as it collapses around you — read the maze on the map, turn the right way at every junction, jump the fallen stone beams, fire jets and floor gaps, and duck the swinging blades. Beat the collapse timer to reach the exit. Wrong turns are dead ends and a blade or fire is instant death, so every corner counts.</p>
+        <h2>Play the 3D temple maze runner today — no download</h2>
+        <p>There is nothing to install. Open the page and run — Temple Collapse is one of SlayFit's free no-download games: instant, fast and easy to share. It is a three-level campaign with three shared lives, each level a tougher maze than the last.</p>
         <h2>How to play</h2>
-        <p>Use ← / → to turn the corners, ↑ to jump the stone beams, and ↓ to duck the swinging blades. Keep clearing hazards to stay ahead of the boulder and push your distance higher each run.</p>
+        <p>On desktop, use ← / → to turn, ↑ to jump and ↓ to duck (arrow keys or WASD; Space also jumps). On mobile, swipe up to jump, down to duck, left or right to turn, and tap to jump. Read the map in the top corner, pick the right way at each junction, and reach the exit before the temple comes down.</p>
         <p>Part of <a href="/">SlayFit free no-download games</a> · also try <a href="/keeper">Keeper</a> and <a href="/dino-survival">Dino Survival</a>.</p>
       </main>`,
   },

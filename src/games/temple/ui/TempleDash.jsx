@@ -221,7 +221,7 @@ export default function TempleDash({ onExit }) {
       {/* Brand */}
       <div className="absolute top-3.5 left-4 z-[5]">
         <div className="font-display font-black text-lg bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">SLAYFIT</div>
-        <div className="text-[9px] tracking-[0.24em] uppercase" style={{ color: '#ffb454' }}>Temple Dash</div>
+        <div className="text-[9px] tracking-[0.24em] uppercase" style={{ color: '#ffb454' }}>Temple Collapse</div>
       </div>
 
       {screen === 'playing' && (
@@ -328,7 +328,7 @@ export default function TempleDash({ onExit }) {
       {screen === 'intro' && (
         <div className="absolute inset-0 z-[20] flex items-center justify-center p-4">
           <div className="panel p-6 w-[min(96vw,520px)] text-center">
-            <div className="font-display font-black text-3xl bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">TEMPLE DASH</div>
+            <div className="font-display font-black text-3xl bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">TEMPLE COLLAPSE</div>
             <div className="text-[11px] tracking-[0.24em] mt-1 uppercase mb-3" style={{ color: '#ffb454' }}>Run · Turn · Survive</div>
             {/* one-line goal — the only sentence (players skim, not read; NN/G) */}
             <p className="text-ink/80 text-[13px] leading-snug mb-5 px-2">

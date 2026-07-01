@@ -65,7 +65,7 @@ export default function App() {
   const pick = (g) => {
     // GA: one event per launch tagged with the game id, so the Events report
     // ranks which game is played most. (Orientation handled by the native wrapper.)
-    track('game_start', { game_id: g, game_name: g === 'dino' ? 'Dino Survival' : g === 'keeper' ? 'Keeper' : g === 'temple' ? 'Temple Dash' : 'Monster Punch' });
+    track('game_start', { game_id: g, game_name: g === 'dino' ? 'Dino Survival' : g === 'keeper' ? 'Keeper' : g === 'temple' ? 'Temple Collapse' : 'Monster Punch' });
     go(routeForGame(g).path);
   };
   const goHome = () => go('/');
