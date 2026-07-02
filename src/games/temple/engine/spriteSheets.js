@@ -14,7 +14,10 @@ export function makeSpriteSheets(THREE) {
     const frames = [];
     for (let i = 0; i < cfg.count; i++) {
       const n = String(i).padStart(2, '0');
-      const t = loader.load(`${cfg.dir}/r_${n}.png`);
+      // Frames ship as high-quality WebP (visually identical to the source PNGs
+      // at ~1/10th the bytes — see public/assets/temple/char). `ext` overridable
+      // per-sheet via ASSETS if ever needed; defaults to webp.
+      const t = loader.load(`${cfg.dir}/r_${n}.${cfg.ext || 'webp'}`);
       t.minFilter = THREE.LinearFilter; t.magFilter = THREE.LinearFilter;
       frames.push(t);
     }

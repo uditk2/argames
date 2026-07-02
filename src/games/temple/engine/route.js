@@ -40,6 +40,7 @@
 //     reachedExit(sp, stop),          // win check (only true once fully turned to the exit)
 //   }
 // ===========================================================================
+import { assetUrl } from '../assetUrl.js';
 
 export function createRoute({
   THREE, scene, WD, geometry, params, segments, junctions, maze, camY, surf,
@@ -120,8 +121,8 @@ export function createRoute({
     if ('colorSpace' in t) t.colorSpace = THREE.SRGBColorSpace;
     return new THREE.MeshBasicMaterial({ map: t, color: tint, side: THREE.DoubleSide });
   };
-  const cornerStoneMat = _mkTile('/assets/temple/tex_wall.jpg', 0x6f5736);   // warm dim stone wall
-  const cornerFloorMat = _mkTile('/assets/temple/tex_floor.jpg', 0x6a5030);  // warm dim stone floor
+  const cornerStoneMat = _mkTile(assetUrl('assets/temple/tex_wall.webp'), 0x6f5736);   // warm dim stone wall
+  const cornerFloorMat = _mkTile(assetUrl('assets/temple/tex_floor.webp'), 0x6a5030);  // warm dim stone floor
   const TILE = 4.5;   // ~one texture tile per this many world units (matches the corridor scale)
 
   // ---- per-junction geometry + waypoint groups -------------------------------

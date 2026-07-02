@@ -32,10 +32,12 @@ const PUBLIC = resolve(ROOT, 'public');
 // whole; everything else is a flat file. Deliberately EXCLUDES the stale
 // run_bak / run_bak29 dirs and the unused lion_fire*/obs_firejet/obs_blade art.
 const TEMPLE_FLAT = [
-  'boulder_hero.png', 'corridor_dark.png', 'crack_floor.png', 'exit_light.jpg',
-  'fire_jet_sheet.png', 'life_full.png', 'life_lost.png', 'lion_head.png',
-  'map_frame.png', 'obs_beam.png', 'obs_blade_head.png', 'tex_floor.jpg',
-  'tex_wall.jpg',
+  // Raster art ships as high-quality WebP (converted from the source PNG/JPG at
+  // ~1/10th the bytes, visually identical). Keeps the initial download small.
+  'boulder_hero.webp', 'corridor_dark.webp', 'crack_floor.webp', 'exit_light.webp',
+  'fire_jet_sheet.webp', 'life_full.webp', 'life_lost.webp', 'lion_head.webp',
+  'map_frame.webp', 'obs_beam.webp', 'obs_blade_head.webp', 'tex_floor.webp',
+  'tex_wall.webp',
   'level1.json', 'level2.json', 'level3_maze.json', 'map.json',
 ];
 const TEMPLE_DIRS = ['char/run', 'char/jump', 'char/duck'];
@@ -52,7 +54,9 @@ function copyDir(from, to) {
     const s = resolve(from, name);
     const d = resolve(to, name);
     if (fs.statSync(s).isDirectory()) copyDir(s, d);
-    else fs.copyFileSync(s, d);
+    // Char frames now ship as WebP; skip the superseded source PNGs so the
+    // packaged build doesn't carry ~50MB of dead sprite art.
+    else if (!name.endsWith('.png')) fs.copyFileSync(s, d);
   }
 }
 

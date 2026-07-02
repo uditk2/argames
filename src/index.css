@@ -48,6 +48,9 @@ body {
   font-family: 'Fredoka', system-ui, sans-serif;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  user-select: none;
 }
 
 .font-display {

@@ -25,6 +25,7 @@
 // ===========================================================================
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { ASSETS, RUN_TO_MOVE } from '../config.js';
+import { assetUrl } from '../assetUrl.js';
 import { createTempleEngine } from '../engine/templeEngine.js';
 import { LEVELS } from '../levels.js';
 // CrazyGames SDK v3 wrapper — every call is a guarded no-op unless the
@@ -32,6 +33,9 @@ import { LEVELS } from '../levels.js';
 // normal portal build is byte-for-byte unaffected in behavior. See
 // ../crazygames/sdk.js.
 import * as CG from '../crazygames/sdk.js';
+// Unified analytics (GA + PostHog). Every call is a guarded no-op unless a
+// provider is configured, so this is safe in every build.
+import { event } from '../../../analytics/index.js';
 
 const IS_PHONE = typeof navigator !== 'undefined' && /Mobi|Android|iPhone|iPod/i.test(navigator.userAgent || '');
 const START_LIVES = 3;
@@ -47,6 +51,15 @@ export default function TempleDash({ onExit }) {
   // --- campaign state (persists across level loads) ---
   const [lives, setLives] = useState(START_LIVES);
   const [levelIndex, setLevelIndex] = useState(0);
+  // Rewarded-ad REVIVE (CrazyGames): one continue per campaign run. `reviving`
+  // guards the button while the ad request is in flight. livesRef mirrors lives
+  // so the engine-driven onState callback can read the current count without a
+  // stale closure (and without firing side-effects inside a setState updater,
+  // which StrictMode double-invokes).
+  const [reviveUsed, setReviveUsed] = useState(false);
+  const [reviving, setReviving] = useState(false);
+  const livesRef = useRef(START_LIVES);
+  useEffect(() => { livesRef.current = lives; }, [lives]);
   // RUN-TO-MOVE toggle (read at engine creation via a ref so loadLevel sees the latest).
   const [runToMove, setRunToMove] = useState(RUN_TO_MOVE);
   const runToMoveRef = useRef(RUN_TO_MOVE);
@@ -111,6 +124,7 @@ export default function TempleDash({ onExit }) {
     setHud({ distance: 0, clears: 0, phase: 'ready' });
     lastPhaseRef.current = 'ready';           // fresh level → next 'over' edge counts
     CG.gameplayStart();                       // CrazyGames: a run/level begins (guarded no-op off-platform)
+    event('temple_level_start', { level: idx + 1, name: (LEVELS[idx] && LEVELS[idx].name) || '' });
 
     const url = (LEVELS[idx] && LEVELS[idx].map) || ASSETS.map;
     let map = null;
@@ -129,13 +143,23 @@ export default function TempleDash({ onExit }) {
         setHud(st);
         // decrement once, on the transition INTO 'over' (edge-detected via ref).
         if (st.phase === 'over' && lastPhaseRef.current !== 'over') {
-          setLives((l) => Math.max(0, l - 1));
           CG.gameplayStop();   // CrazyGames: active play ended (death) — pause/allow ads.
+          const after = Math.max(0, livesRef.current - 1);
+          setLives(after);
+          event('temple_death', {
+            cause: st.cause || 'unknown', distance: st.distance, clears: st.clears,
+            level: idx + 1, lives_left: after,
+          });
+          if (after <= 0) event('temple_game_over', { distance: st.distance, clears: st.clears, level: idx + 1 });
         }
         // CrazyGames: also stop on the edge into 'won' (level clear / escape). The
         // between-levels midgame ad is fired from nextLevel, AFTER this stop.
         if (st.phase === 'won' && lastPhaseRef.current !== 'won') {
           CG.gameplayStop();
+          const last = idx >= LEVELS.length - 1;
+          event(last ? 'temple_campaign_complete' : 'temple_level_complete', {
+            level: idx + 1, distance: st.distance, clears: st.clears, lives_left: livesRef.current,
+          });
         }
         lastPhaseRef.current = st.phase;
       },
@@ -161,12 +185,39 @@ export default function TempleDash({ onExit }) {
     eng.start();
   }, [teardown, flashCue, sendInput]);
 
-  // Start the campaign fresh: full lives, level 0.
+  // Start the campaign fresh: full lives, level 0, revive available again.
   const startCampaign = useCallback((fromIdx = 0) => {
     setLives(START_LIVES);
+    livesRef.current = START_LIVES;
     setLevelIndex(fromIdx);
+    setReviveUsed(false);
+    setReviving(false);
+    event('temple_campaign_start', { from_level: fromIdx + 1 });
     loadLevel(fromIdx);
   }, [loadLevel]);
+
+  // REWARDED-AD REVIVE (CrazyGames only) — one continue per campaign run. Shown
+  // on Game Over. Watching the rewarded video grants a life and retries the
+  // current level; a skip/adblock/error just leaves the Game Over screen intact.
+  // Rewarded ads must be a deliberate opt-in, so this is click-only (never mapped
+  // to the Enter/Space primary, which stays "Restart").
+  const doRevive = useCallback(async () => {
+    if (reviving || reviveUsed) return;
+    setReviving(true);
+    event('temple_revive_started', { level: levelIndex + 1 });
+    const r = await CG.rewardedAd({});
+    setReviving(false);
+    if (r && r.shown) {
+      event('temple_revive_watched', { level: levelIndex + 1 });
+      setReviveUsed(true);
+      setLives(1);
+      livesRef.current = 1;
+      lastPhaseRef.current = 'ready';   // next death edge counts again
+      sendInput('restart');             // resume the current level with the granted life
+    } else {
+      event('temple_revive_failed', { level: levelIndex + 1, reason: (r && r.reason) || 'unknown' });
+    }
+  }, [reviving, reviveUsed, levelIndex, sendInput]);
 
   const phase = hud.phase;
   const over = phase === 'over';
@@ -254,7 +305,7 @@ export default function TempleDash({ onExit }) {
             <canvas ref={mmRef} width={150} height={150}
               className="absolute rounded-md"
               style={{ left: '13.6%', top: '13.6%', width: '72.7%', height: '72.7%', background: 'radial-gradient(circle at 50% 42%, #241910 0%, #110b06 100%)' }} />
-            <img src="/assets/temple/map_frame.png" alt="" aria-hidden="true"
+            <img src={assetUrl('assets/temple/map_frame.webp')} alt="" aria-hidden="true"
               className="absolute inset-0 w-full h-full pointer-events-none select-none"
               style={{ filter: 'drop-shadow(0 2px 7px rgba(0,0,0,0.55))' }} />
           </div>
@@ -320,6 +371,9 @@ export default function TempleDash({ onExit }) {
             <GameOverPanel
               distance={hud.distance}
               clears={hud.clears}
+              canRevive={CG.isEnabled() && !reviveUsed}
+              reviving={reviving}
+              onRevive={doRevive}
               onRestart={restartCampaign}
               onExit={onExit ? backToMenu : null}
             />
@@ -463,7 +517,7 @@ function LivesRow({ lives }) {
         return (
           <img
             key={i}
-            src={alive ? '/assets/temple/life_full.png' : '/assets/temple/life_lost.png'}
+            src={alive ? assetUrl('assets/temple/life_full.webp') : assetUrl('assets/temple/life_lost.webp')}
             alt={alive ? 'life' : 'life lost'}
             width={20}
             height={20}
@@ -516,8 +570,10 @@ function RetryPanel({ cause, distance, clears, lives, onRetry, onExit }) {
   );
 }
 
-// DEATH with no lives left — distinct deep-red GAME OVER, restarts the campaign.
-function GameOverPanel({ distance, clears, onRestart, onExit }) {
+// DEATH with no lives left — distinct deep-red GAME OVER. On CrazyGames a
+// once-per-run REWARDED-AD "Continue" is offered (canRevive): watching grants a
+// life and resumes the level. Restart resets the campaign; both stay available.
+function GameOverPanel({ distance, clears, canRevive, reviving, onRevive, onRestart, onExit }) {
   return (
     <Overlay bg="rgba(28,4,4,0.86)" border="#ff2e2255">
       <div className="font-display font-black text-4xl" style={{ color: '#ff2e22', textShadow: '0 2px 16px #000, 0 0 28px #ff2e2266' }}>
@@ -527,7 +583,18 @@ function GameOverPanel({ distance, clears, onRestart, onExit }) {
         The temple keeps you
       </div>
       <div className="mt-3 text-[15px]" style={{ color: '#ffd9c8' }}>{distance} m · {clears} {clears === 1 ? 'clear' : 'clears'}</div>
-      <div className="flex gap-2 justify-center flex-wrap mt-5">
+
+      {canRevive && (
+        <div className="mt-5">
+          <button onClick={onRevive} disabled={reviving}
+            className="w-full py-3 rounded-xl font-black text-[#0b0603] bg-gradient-to-r from-[#ffd45a] to-[#e8a33a] shadow-glow-fire hover:brightness-110 transition disabled:opacity-70 disabled:cursor-wait">
+            {reviving ? 'Loading ad…' : '▶ Continue — watch ad'}
+          </button>
+          <div className="text-[11px] text-ink/45 mt-1">One free continue · keeps your run alive</div>
+        </div>
+      )}
+
+      <div className="flex gap-2 justify-center flex-wrap mt-4">
         <PrimaryBtn onClick={onRestart}>Restart</PrimaryBtn>
         <BackBtn onExit={onExit} />
       </div>

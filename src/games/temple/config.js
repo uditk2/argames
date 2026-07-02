@@ -14,34 +14,35 @@
 // ===========================================================================
 
 // Asset URLs (served from public/). Reference by URL inside the module.
+import { assetUrl } from './assetUrl.js';
 export const ASSETS = {
-  corridor: '/assets/temple/corridor_dark.png',
-  boulder: '/assets/temple/boulder_hero.png',
+  corridor: assetUrl('assets/temple/corridor_dark.webp'),
+  boulder: assetUrl('assets/temple/boulder_hero.webp'),
   // sprite frame counts (r_00..r_NN.png), zero-padded to 2 digits.
-  run: { dir: '/assets/temple/char/run', count: 19 },   // tightened run cycle (cut frames 8-20 of the 32-frame original; kept 21)
-  jump: { dir: '/assets/temple/char/jump', count: 24 },
-  duck: { dir: '/assets/temple/char/duck', count: 24 },
-  beam: '/assets/temple/obs_beam.png',    // photoreal carved fallen beam (keyed)
-  blade: '/assets/temple/obs_blade_head.png',  // photoreal blade head (chain cropped; a 3D chain is added in-engine)
+  run: { dir: assetUrl('assets/temple/char/run'), count: 19 },   // tightened run cycle (cut frames 8-20 of the 32-frame original; kept 21)
+  jump: { dir: assetUrl('assets/temple/char/jump'), count: 24 },
+  duck: { dir: assetUrl('assets/temple/char/duck'), count: 24 },
+  beam: assetUrl('assets/temple/obs_beam.webp'),    // photoreal carved fallen beam (keyed)
+  blade: assetUrl('assets/temple/obs_blade_head.webp'),  // photoreal blade head (chain cropped; a 3D chain is added in-engine)
   // Photoreal carved LION-MOUTH wall vent spitting a horizontal flame jet across the
   // corridor (keyed PNG). Mounted on a side wall; the flame height decides the move:
   // a LOW jet you JUMP, a HIGH jet you DUCK.
   // Two layers: the carved stone lion HEAD stays bolted to the wall, and a real
   // FIRE VIDEO (Grok, 6s) baked into a sprite sheet plays from its mouth across the hall.
-  fireLion: '/assets/temple/lion_head.png',          // static stone head (flame removed)
-  fireFlameSheet: '/assets/temple/fire_jet_sheet.png', // animated flamethrower jet (sprite sheet)
+  fireLion: assetUrl('assets/temple/lion_head.webp'),          // static stone head (flame removed)
+  fireFlameSheet: assetUrl('assets/temple/fire_jet_sheet.webp'), // animated flamethrower jet (sprite sheet)
   // Photoreal top-down broken temple floor with a chasm — laid flat on the floor at a gap.
-  crackFloor: '/assets/temple/crack_floor.png',
+  crackFloor: assetUrl('assets/temple/crack_floor.webp'),
   // Photoreal first-person view straight down a sunlit temple corridor ending in a
   // bright golden archway with god-ray sun shafts — TIP-projected onto the final
   // dedicated EXIT corridor (same aspect/style as corridor_dark.png). .jpg, not .png.
-  exitImg: '/assets/temple/exit_light.jpg',
+  exitImg: assetUrl('assets/temple/exit_light.webp'),
   // Seamless tileable surfacing textures for the ALTERNATE "tiled" corridor mode
   // (A/B vs the default TIP projection). Used by MeshStandardMaterial when
   // CORRIDOR_SURFACE==='tiled' (or ?surf=tiled). Flat/orthographic, no baked light.
-  texFloor: '/assets/temple/tex_floor.jpg',
-  texWall: '/assets/temple/tex_wall.jpg',
-  map: '/assets/temple/map.json',
+  texFloor: assetUrl('assets/temple/tex_floor.webp'),
+  texWall: assetUrl('assets/temple/tex_wall.webp'),
+  map: assetUrl('assets/temple/map.json'),
 };
 
 // ---- ALIGNMENT VARIATIONS (A/B/C) ------------------------------------------

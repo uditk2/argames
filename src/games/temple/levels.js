@@ -14,10 +14,11 @@
 // L3 are hand-authored, PRE-DETERMINED maze maps (mode:"maze") of rising
 // difficulty. Straight progression — no level select.
 // ===========================================================================
+import { assetUrl } from './assetUrl.js';
 export const LEVELS = [
-  { name: 'The Long Hall', map: '/assets/temple/level1.json' },   // gentle linear intro
-  { name: 'Bladeworks',    map: '/assets/temple/level2.json' },   // first maze (mode:"maze")
-  { name: 'The Labyrinth', map: '/assets/temple/level3_maze.json' }, // hard maze (mode:"maze")
+  { name: 'The Long Hall', map: assetUrl('assets/temple/level1.json') },   // gentle linear intro
+  { name: 'Bladeworks',    map: assetUrl('assets/temple/level2.json') },   // first maze (mode:"maze")
+  { name: 'The Labyrinth', map: assetUrl('assets/temple/level3_maze.json') }, // hard maze (mode:"maze")
 ];
 
 export default LEVELS;

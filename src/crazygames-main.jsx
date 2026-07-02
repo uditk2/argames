@@ -16,8 +16,10 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import TempleDash from './games/temple/index.js';
+import ConsentNotice from './ui/ConsentNotice.jsx';
 import './index.css';
 import { initSdk } from './games/temple/crazygames/sdk.js';
+import { initPostHog } from './analytics/index.js';
 
 // Belt-and-suspenders: ensure the flag is on even if the HTML changes.
 if (typeof window !== 'undefined') window.__CRAZYGAMES__ = true;
@@ -26,8 +28,14 @@ if (typeof window !== 'undefined') window.__CRAZYGAMES__ = true;
 // it resolves to a no-op off-platform and logs its mode). Fire-and-forget.
 initSdk();
 
+// Product analytics. No-op unless VITE_POSTHOG_KEY is set at build time.
+initPostHog();
+
 createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <TempleDash />
+    <>
+      <TempleDash />
+      <ConsentNotice />
+    </>
   </React.StrictMode>
 );
