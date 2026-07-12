@@ -38,6 +38,8 @@ import { LEVELS } from '../levels.js';
 // Meta-progression (localStorage): per-level best time + stars, resume pointer,
 // lifetime run/relic totals. A scoreboard only — never touches gameplay.
 import * as progress from '../engine/progress.js';
+// Folklore narrative copy (Syamantaka) — text only, shown on study/wizard/end screens.
+import * as narrative from '../narrative.js';
 // CrazyGames SDK v3 wrapper — every call is a guarded no-op unless the
 // standalone build enables it (window.__CRAZYGAMES__ / VITE_CRAZYGAMES). The
 // normal portal build is byte-for-byte unaffected in behavior. See
@@ -560,9 +562,14 @@ export default function TempleDash({ onExit }) {
             <div className="absolute inset-0 z-[20] flex flex-col items-center justify-between py-7"
               style={{ background: 'rgba(6,4,2,0.74)' }}>
               <div className="text-center px-4 w-full">
-                <div className="text-[11px] font-black uppercase tracking-[0.22em] mb-3" style={{ color: '#ffb454' }}>
+                <div className="text-[11px] font-black uppercase tracking-[0.22em] mb-1.5" style={{ color: '#ffb454' }}>
                   Level {levelIndex + 1} of 6 · {levelName}
                 </div>
+                {narrative.LEVEL_LINES[levelIndex] && (
+                  <div className="text-[12px] italic mb-3 max-w-[420px] mx-auto leading-snug" style={{ color: '#e8c79a' }}>
+                    “{narrative.LEVEL_LINES[levelIndex].en}”
+                  </div>
+                )}
                 <LevelJourney current={levelIndex} starsByLevel={starsByLevel} />
               </div>
               {/* THE map — the point of the study phase. In normal flex flow between the
@@ -675,8 +682,8 @@ export default function TempleDash({ onExit }) {
                   <img src={assetUrl('assets/temple/stone_door.webp')} alt="" width={168} height={168} draggable={false}
                     className="mx-auto mb-4 select-none" style={{ objectFit: 'contain', filter: 'drop-shadow(0 4px 16px rgba(0,0,0,0.55))' }} />
                   <div className="text-[10px] font-black uppercase tracking-[0.22em] mb-1" style={{ color: '#ffb454' }}>The heist</div>
-                  <div className="font-display font-black text-[20px] mb-2" style={{ color: '#ffe9c8' }}>Take the Sunstone</div>
-                  <p className="text-[13px] leading-snug px-2" style={{ color: '#ffd99a' }}>Deep in the temple sits the Sunstone. Grab it — and the whole temple begins to come down around you.</p>
+                  <div className="font-display font-black text-[20px] mb-2" style={{ color: '#ffe9c8' }}>Take the Syamantaka</div>
+                  <p className="text-[13px] leading-snug px-2" style={{ color: '#ffd99a' }}>{narrative.PREMISE.en}</p>
                 </div>
               )}
               {wizStep === 1 && (
@@ -706,7 +713,7 @@ export default function TempleDash({ onExit }) {
                   <div className="mb-4"><LevelJourney current={0} starsByLevel={starsByLevel} /></div>
                   <div className="text-[10px] font-black uppercase tracking-[0.22em] mb-1" style={{ color: '#ffb454' }}>The journey</div>
                   <div className="font-display font-black text-[20px] mb-2" style={{ color: '#ffe9c8' }}>Six trials, one way out</div>
-                  <p className="text-[13px] leading-snug px-2" style={{ color: '#ffd99a' }}>Grab the Sunstone on the fifth trial and burst into daylight on the sixth. 6 levels · 3 shared lives.</p>
+                  <p className="text-[13px] leading-snug px-2" style={{ color: '#ffd99a' }}>Grab the Syamantaka on the fifth trial and burst into daylight on the sixth. 6 levels · 3 shared lives.</p>
                   {(summary.relics > 0 || summary.totalStars > 0 || summary.runs > 0) && (
                     <div className="mt-3 text-[11px] font-semibold tracking-[0.06em]" style={{ color: '#ffd45a' }}>
                       ★ {summary.totalStars}/{summary.maxStars} · {summary.relics} {summary.relics === 1 ? 'relic' : 'relics'} recovered · {summary.runs} {summary.runs === 1 ? 'run' : 'runs'}
@@ -864,14 +871,16 @@ function BackBtn({ onExit }) {
   );
 }
 
-// DEATH with lives remaining — CRUSHED/SLICED + "N lives left" + Retry level.
+// DEATH with lives remaining — a calm "RUN OVER" with the cause demoted to a
+// small in-voice subtitle (still teaches what got you; just not shouty).
 function RetryPanel({ cause, distance, clears, lives, onRetry, onExit }) {
   return (
     <Overlay bg="rgba(12,6,3,0.78)" border="#ffb45433">
-      <div className="font-display font-black text-4xl" style={{ color: '#ff5a3c', textShadow: '0 2px 12px #000' }}>
-        {cause === 'blade' ? 'SLICED' : cause === 'fire' ? 'BURNED' : cause === 'collapse' ? 'ENTOMBED' : cause === 'blocked' ? 'BLOCKED' : cause === 'pit' ? 'FELL' : 'CRUSHED'}
+      <div className="font-display font-black text-4xl" style={{ color: '#ff8a5a', textShadow: '0 2px 12px #000' }}>
+        RUN OVER
       </div>
-      <div className="mt-1 text-[13px] font-semibold uppercase tracking-[0.16em]" style={{ color: '#ffb454' }}>
+      <div className="mt-1 text-[13px] italic" style={{ color: '#e8c79a' }}>{narrative.causeSubtitle(cause)}</div>
+      <div className="mt-1.5 text-[13px] font-semibold uppercase tracking-[0.16em]" style={{ color: '#ffb454' }}>
         {lives} {lives === 1 ? 'life' : 'lives'} left
       </div>
       <div className="mt-2 text-[15px]" style={{ color: '#ffd99a' }}>{distance} m · {clears} {clears === 1 ? 'clear' : 'clears'}</div>
@@ -953,6 +962,9 @@ function VictoryPanel({ distance, clears, lives, summary, onRestart, onExit }) {
       </div>
       <div className="mt-1 text-[12px] tracking-[0.22em] uppercase" style={{ color: '#9be7a0' }}>
         Campaign complete
+      </div>
+      <div className="mt-2 text-[12.5px] italic max-w-[380px] mx-auto leading-snug" style={{ color: '#e8c79a' }}>
+        “{narrative.VICTORY_LINE.en}”
       </div>
       <div className="mt-3 text-[15px]" style={{ color: '#ffe9c8' }}>
         {distance} m · {clears} {clears === 1 ? 'clear' : 'clears'} · {lives} {lives === 1 ? 'life' : 'lives'} left
@@ -1074,7 +1086,7 @@ function IntroMap() {
 // a check, the current step glows, upcoming steps are dim. `current` is 0-based.
 const JOURNEY_STEPS = [
   { n: 1, label: 'Halls' }, { n: 2, label: 'Blades' }, { n: 3, label: 'The Deep' },
-  { n: 4, label: "Lion's Maw" }, { n: 5, label: 'Sunstone', icon: '🏆' }, { n: 6, label: 'Daylight', icon: '🚪' },
+  { n: 4, label: "Lion's Maw" }, { n: 5, label: 'Syamantaka', icon: '🏆' }, { n: 6, label: 'Daylight', icon: '🚪' },
 ];
 // Three star sockets — filled gold up to `n`, empty (dim outline) beyond. The
 // empty sockets are the deliberate open loop: the player sees exactly what's left

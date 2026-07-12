@@ -20,7 +20,7 @@ export const LEVELS = [
   { name: 'Whispering Blades', map: assetUrl('assets/temple/level2.json') },     // blades + fallen beams
   { name: 'The Sunken Deep',  map: assetUrl('assets/temple/level3_maze.json') }, // + cracked floor
   { name: "The Lion's Maw",   map: assetUrl('assets/temple/level4_maze.json') }, // + fire-spitting lion
-  { name: 'The Sunstone',     map: assetUrl('assets/temple/level5_maze.json') }, // take the artifact
+  { name: 'The Syamantaka',   map: assetUrl('assets/temple/level5_maze.json') }, // take the artifact (Surya's sun-gem)
   { name: 'Into Daylight',    map: assetUrl('assets/temple/level6_maze.json') }, // escape the temple
 ];
 

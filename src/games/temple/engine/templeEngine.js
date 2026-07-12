@@ -45,10 +45,10 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
   const GRACE_S = mp.startGrace != null ? mp.startGrace : PLAY.graceS;
   // per-level COLLAPSE budget (seconds): map params, falling back to the config default.
   const COLLAPSE_S = mp.collapseTime != null ? mp.collapseTime : MAP_DEFAULTS.collapseTime;
-  // LEVEL ENDING: 'door' (default, L1-L4 stone door), 'artifact' (L5 — take the Sunstone),
+  // LEVEL ENDING: 'door' (default, L1-L4 stone door), 'artifact' (L5 — take the Syamantaka),
   // or 'exit' (L6 — burst into daylight). Drives the end-of-run visual + win message.
   const ENDING = (map && map.ending) || mp.ending || 'door';
-  const WIN_CUE = ENDING === 'artifact' ? 'THE SUNSTONE!' : ENDING === 'exit' ? 'DAYLIGHT!' : 'ESCAPE!';
+  const WIN_CUE = ENDING === 'artifact' ? 'THE SYAMANTAKA!' : ENDING === 'exit' ? 'DAYLIGHT!' : 'ESCAPE!';
   // ---- MAZE MODE (opt-in) ----------------------------------------------------
   // The engine has two route builders. The DEFAULT (linear) builds a fixed chain
   // of L-shaped units from `map.segments` (only the correct side opens; judge the

@@ -51,7 +51,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
   const BUDGET_S = mp.collapseTime != null ? mp.collapseTime : MAP_DEFAULTS.collapseTime;
   const RUN2MOVE = (runToMove != null) ? !!runToMove : RUN_TO_MOVE;
   const ENDING = (map && map.ending) || mp.ending || 'door';
-  const WIN_CUE = ENDING === 'artifact' ? 'THE SUNSTONE!' : ENDING === 'exit' ? 'DAYLIGHT!' : 'ESCAPE!';
+  const WIN_CUE = ENDING === 'artifact' ? 'THE SYAMANTAKA!' : ENDING === 'exit' ? 'DAYLIGHT!' : 'ESCAPE!';
   const ALIGN = ALIGN_PRESETS[Math.max(0, Math.min(ALIGN_PRESETS.length - 1, ALIGN_VARIATION - 1))];
   const camY = CAM.eyeY;
 
