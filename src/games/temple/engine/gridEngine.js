@@ -35,6 +35,7 @@ import { createHazardProps } from './hazardProps.js';
 import { createGridHazards } from './gridHazards.js';
 import { createAvatarActor } from './avatarActor.js';
 import { createStoneDoor } from './stoneDoor.js';
+import { createRelicProp } from './relicProp.js';
 import { drawMinimap } from './minimap.js';
 import { createCollapse } from './collapse.js';
 import { createBoulderFx } from './boulderFx.js';
@@ -53,6 +54,13 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
   const WIN_CUE = ENDING === 'artifact' ? 'THE SUNSTONE!' : ENDING === 'exit' ? 'DAYLIGHT!' : 'ESCAPE!';
   const ALIGN = ALIGN_PRESETS[Math.max(0, Math.min(ALIGN_PRESETS.length - 1, ALIGN_VARIATION - 1))];
   const camY = CAM.eyeY;
+
+  // Cross-level "you're carrying the relic" flag (set when L5's gem is grabbed,
+  // read by L6 for the carried glow). sessionStorage so it survives the per-level
+  // engine teardown but not a browser session; guarded for SSR/tests.
+  const RELIC_KEY = 'temple_relic_taken';
+  function relicTaken() { try { return sessionStorage.getItem(RELIC_KEY) === '1'; } catch { return false; } }
+  function setRelicTaken(v) { try { v ? sessionStorage.setItem(RELIC_KEY, '1') : sessionStorage.removeItem(RELIC_KEY); } catch { /* SSR/tests */ } }
 
   // ---- three.js scene ---------------------------------------------------------
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -180,6 +188,21 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     glow.rotation.y = Math.atan2(approach.x, approach.z);
     scene.add(glow);
   }
+  // RELIC (L5): the Syamantaka sun-gem on a pedestal at the exit cell. This is
+  // the campaign's peak — a real prop you approach and physically take, replacing
+  // the old text-cue-only climax. Grabbed on win() (see below).
+  const relic = ENDING === 'artifact' ? createRelicProp({
+    THREE, scene, W: CELL, H, addLight,
+    pos: { x: exitWorld.x, z: exitWorld.z }, dirVec: approach,
+  }) : null;
+  // CARRIED GLOW (L6): if the relic was taken on L5 this run, the runner carries
+  // a warm gold glow — the "you're holding the thing you came for" payoff. The
+  // flag is set on grab (below) and persists for the L6 leg via sessionStorage.
+  let carryGlow = null;
+  if (ENDING === 'exit' && relicTaken()) {
+    carryGlow = new THREE.PointLight(0xffd24a, 2.0, CELL * 2.2, 2.0);
+    scene.add(carryGlow);
+  }
   // STONE DOOR (L1-L4): a slab just past the exit cell's centre, lowering with the timer.
   const door = ENDING === 'door' ? createStoneDoor({
     THREE, scene, W: CELL, H,
@@ -230,6 +253,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     nav.reset(); collapse.reset(); hazards.reset(); fx.reset(); avatar.reset();
     world.retarget(nav.cell.r, nav.cell.c, nav.heading, true);   // re-anchor the entry projection
     if (door) door.reset();
+    if (relic) { relic.reset(); setRelicTaken(false); }   // retrying L5 un-takes the gem
     hitDeadEnds.clear();
     phase = 'run'; collapseArmed = false; runT = 0; runDist = 0; clears = 0;
     deathCause = null; winT = 0; stuckT = 0; sliceT = 0; stuckWarned = false; stuckAction = 'jump';
@@ -279,6 +303,9 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
   function win(text) {
     phase = 'won'; winT = 0; avatar.setAnim('run');
     audio.ambient(false); (ENDING === 'artifact' ? audio.pickup() : audio.win());
+    // L5: physically take the gem — fires the 0.6s slow-mo reach + light burst,
+    // and flags the run so L6 shows the carried glow.
+    if (relic) { relic.grab(); setRelicTaken(true); }
     cue(text || WIN_CUE, '#ffe08a'); pushState();
   }
 
@@ -385,6 +412,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     const tnow = now * 0.001;
 
     props.update(dt, tnow);   // blade swings + flame sheet
+    if (relic) relic.update(dt, tnow);   // idle float/pulse + grab burst
 
     // ---- collapse countdown (armed once the grace run-up is spent) -------------
     if (!collapseArmed && !readingHold && phase === 'run' && !falling
@@ -489,6 +517,12 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
       playerTorch.position.set(sPos.x + fxv * 2.5, H - 2.0, sPos.z + fzv * 2.5);
       playerTorch.intensity = PLAYER_TORCH_I * (1 + 0.08 * Math.sin(tnow * 13.7) + 0.05 * Math.sin(tnow * 29.3));
     }
+    // carried relic glow (L6): a warm gold pool riding on the runner, flickering
+    // like the gem's pulse — the visible sign you're holding the Syamantaka.
+    if (carryGlow) {
+      carryGlow.position.set(sPos.x, H * 0.5, sPos.z);
+      carryGlow.intensity = 2.0 * (1 + 0.12 * Math.sin(tnow * 2.6));
+    }
     // collapse cinematic camera rumble (same pattern as the fx-canvas shake)
     if (collapse.collapsing) {
       const cmag = Math.hypot(collapse.shakeX, collapse.shakeY) / Math.max(1, COLLAPSE.shakeAmp);
@@ -539,6 +573,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     stop();
     try { avatar.dispose(); } catch { /* gone */ }
     try { props.dispose(); } catch { /* gone */ }
+    try { if (relic) relic.dispose(); } catch { /* gone */ }
     try { world.dispose(); } catch { /* gone */ }
     try {
       scene.traverse((obj) => {
