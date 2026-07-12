@@ -115,6 +115,13 @@ export function createAudio() {
     else { if (!playBuf('die', 0.8)) lose(); }
   }
   const doorGrind = () => {};   // stone-door grind removed (read as "cranking") — a better track is coming
+  // SEAL: the heavy stone slam as the wall closes behind you on a level clear —
+  // a low-frequency thud + a short body of rumble (no sample needed).
+  const seal = () => {
+    if (playBuf('seal', 0.9)) return;
+    noise({ d: 0.5, peak: 0.55, freq: 200 });
+    tone({ freq: 120, type: 'sine', slideTo: 42, slideT: 0.32, d: 0.5, peak: 0.5 });
+  };
 
   // --- beds ------------------------------------------------------------------
   function startRumble() {
@@ -163,7 +170,7 @@ export function createAudio() {
   function toggleMuted() { return setMuted(!muted); }
 
   return {
-    resume, jump, duck, turn, back, stumble, clear, pickup, win, lose, die, doorGrind,
+    resume, jump, duck, turn, back, stumble, clear, pickup, win, lose, die, doorGrind, seal,
     ambient, danger, tickFeet, setMuted, toggleMuted, get muted() { return muted; },
   };
 }

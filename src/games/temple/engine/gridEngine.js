@@ -232,6 +232,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
   let pendTurn = null, pendAt = 0;   // buffered left/right tap (applied at the next junction)
   const DUCK_WINDOW = 480;                     // ms a duck press counts as "ducking" at the door
   let hop = 0, dip = 0, hopV = 0, dipV = 0;
+  let sealShake = 0;   // decaying camera-shake pulse fired when the wall slams shut behind you
   const hitDeadEnds = new Set();
   let mmCanvas = minimapCanvas || null, mx = mmCanvas ? mmCanvas.getContext('2d') : null;
   // smoothed rig (heading + position) so turns/pivots swing instead of snapping
@@ -258,7 +259,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     phase = 'run'; collapseArmed = false; runT = 0; runDist = 0; clears = 0;
     deathCause = null; winT = 0; stuckT = 0; sliceT = 0; stuckWarned = false; stuckAction = 'jump';
     falling = false; fallT = 0; duckUntil = -1; doorCued = false;
-    hop = 0; dip = 0; hopV = 0; dipV = 0;
+    hop = 0; dip = 0; hopV = 0; dipV = 0; sealShake = 0;
     const hv = nav.headingVec(); camFwd.x = hv.x; camFwd.z = hv.z;
     rigInit = false;
     audio.ambient(false);
@@ -306,6 +307,9 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     // L5: physically take the gem — fires the 0.6s slow-mo reach + light burst,
     // and flags the run so L6 shows the carried glow.
     if (relic) { relic.grab(); setRelicTaken(true); }
+    // L1–L4: SLAM the wall shut behind you — the "no going back" climax. The boom
+    // + camera-shake pulse fire on impact (in the loop), synced to the visual.
+    if (door) door.seal();
     cue(text || WIN_CUE, '#ffe08a'); pushState();
   }
 
@@ -432,6 +436,8 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
       if (phase === 'run' && !doorCued && door.lowGap && distExit() <= PLAY.cueLead * 1.2) {
         doorCued = true; cue('DUCK — DOOR LOW', '#ffd23a');
       }
+      // slam behind you on a clear: advance the drop; on impact fire boom + shake.
+      if (door.sealing && door.tickSeal(dt)) { sealShake = 1; audio.seal(); }
     }
     audio.danger(Math.max(0, Math.min(1, 1 - collapse.remaining() / Math.max(1, BUDGET_S))));
 
@@ -529,6 +535,13 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
       const ccs = COLLAPSE.camShake * Math.min(1, cmag);
       cam.position.x += Math.sin(tnow * 61.0) * ccs;
       cam.position.y += Math.cos(tnow * 67.0) * ccs;
+    }
+    // wall-slam kick: a sharp decaying jolt when the exit seals behind you.
+    if (sealShake > 0.001) {
+      const scs = (COLLAPSE.camShake || 0.4) * 1.6 * sealShake;
+      cam.position.x += Math.sin(tnow * 84.0) * scs;
+      cam.position.y += Math.cos(tnow * 73.0) * scs;
+      sealShake = Math.max(0, sealShake - dt * 2.6);
     }
 
     // ---- avatar -------------------------------------------------------------------
