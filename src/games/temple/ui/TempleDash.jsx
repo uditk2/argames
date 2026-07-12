@@ -35,6 +35,9 @@ import { createGridEngine } from '../engine/gridEngine.js';
 import { createTempleEngine } from '../engine/templeEngine.js';
 import { buildEngineMap } from '../engine/mazeGen.js';
 import { LEVELS } from '../levels.js';
+// Meta-progression (localStorage): per-level best time + stars, resume pointer,
+// lifetime run/relic totals. A scoreboard only — never touches gameplay.
+import * as progress from '../engine/progress.js';
 // CrazyGames SDK v3 wrapper — every call is a guarded no-op unless the
 // standalone build enables it (window.__CRAZYGAMES__ / VITE_CRAZYGAMES). The
 // normal portal build is byte-for-byte unaffected in behavior. See
@@ -77,6 +80,12 @@ export default function TempleDash({ onExit }) {
   const readTimerRef = useRef(null);
   const [cue, setCue] = useState(null);              // { text, color, id }
   const cueTimer = useRef(null);
+  // Meta-progression views: stars earned per level (for the journey strip), and the
+  // result of the most recent clear (for the win panels). Refreshed from progress.js.
+  const [starsByLevel, setStarsByLevel] = useState(() => progress.getStarsByLevel());
+  const [summary, setSummary] = useState(() => progress.getSummary());
+  const [lastResult, setLastResult] = useState(null);   // { stars, best, isBestTime }
+  const refreshProgress = useCallback(() => { setStarsByLevel(progress.getStarsByLevel()); setSummary(progress.getSummary()); }, []);
 
   // --- campaign state (persists across level loads) ---
   const [lives, setLives] = useState(START_LIVES);
@@ -255,8 +264,15 @@ export default function TempleDash({ onExit }) {
         if (st.phase === 'won' && lastPhaseRef.current !== 'won') {
           CG.gameplayStop();
           const last = idx >= LEVELS.length - 1;
+          // record best time + stars for this level (time left on the clock vs budget).
+          const budget = (engRef.current && engRef.current.budgetS) || 0;
+          const res = progress.recordClear(idx, st.timeLeft != null ? st.timeLeft : 0, budget);
+          if (last) progress.recordVictory();
+          setLastResult(res);
+          refreshProgress();
           event(last ? 'temple_campaign_complete' : 'temple_level_complete', {
             level: idx + 1, distance: st.distance, clears: st.clears, lives_left: livesRef.current,
+            stars: res.stars, best_time: res.best,
           });
         }
         lastPhaseRef.current = st.phase;
@@ -308,7 +324,7 @@ export default function TempleDash({ onExit }) {
         if (left <= 0) { beginRun(); } else setReading({ secs: left });
       }, 1000);
     }
-  }, [teardown, flashCue, sendInput, beginRun, pauseGame]);
+  }, [teardown, flashCue, sendInput, beginRun, pauseGame, refreshProgress]);
 
   // Start the campaign fresh: full lives, level 0, revive available again.
   const startCampaign = useCallback((fromIdx = 0) => {
@@ -317,9 +333,12 @@ export default function TempleDash({ onExit }) {
     setLevelIndex(fromIdx);
     setReviveUsed(false);
     setReviving(false);
+    setLastResult(null);
+    progress.recordCampaignStart();
+    refreshProgress();
     event('temple_campaign_start', { from_level: fromIdx + 1 });
     loadLevel(fromIdx);
-  }, [loadLevel]);
+  }, [loadLevel, refreshProgress]);
 
   // REWARDED-AD REVIVE (CrazyGames only) — one continue per campaign run. Shown
   // on Game Over. Watching the rewarded video grants a life and retries the
@@ -544,7 +563,7 @@ export default function TempleDash({ onExit }) {
                 <div className="text-[11px] font-black uppercase tracking-[0.22em] mb-3" style={{ color: '#ffb454' }}>
                   Level {levelIndex + 1} of 6 · {levelName}
                 </div>
-                <LevelJourney current={levelIndex} />
+                <LevelJourney current={levelIndex} starsByLevel={starsByLevel} />
               </div>
               {/* THE map — the point of the study phase. In normal flex flow between the
                   header and the GO block: always large, always centered, can't overlap
@@ -611,6 +630,7 @@ export default function TempleDash({ onExit }) {
               distance={hud.distance}
               clears={hud.clears}
               lives={lives}
+              summary={summary}
               onRestart={restartCampaign}
               onExit={onExit ? backToMenu : null}
             />
@@ -618,6 +638,7 @@ export default function TempleDash({ onExit }) {
             <LevelCompletePanel
               levelName={levelName}
               lives={lives}
+              result={lastResult}
               onNext={nextLevel}
               onExit={onExit ? backToMenu : null}
             />
@@ -682,10 +703,15 @@ export default function TempleDash({ onExit }) {
               )}
               {wizStep === 3 && (
                 <div>
-                  <div className="mb-4"><LevelJourney current={0} /></div>
+                  <div className="mb-4"><LevelJourney current={0} starsByLevel={starsByLevel} /></div>
                   <div className="text-[10px] font-black uppercase tracking-[0.22em] mb-1" style={{ color: '#ffb454' }}>The journey</div>
                   <div className="font-display font-black text-[20px] mb-2" style={{ color: '#ffe9c8' }}>Six trials, one way out</div>
                   <p className="text-[13px] leading-snug px-2" style={{ color: '#ffd99a' }}>Grab the Sunstone on the fifth trial and burst into daylight on the sixth. 6 levels · 3 shared lives.</p>
+                  {(summary.relics > 0 || summary.totalStars > 0 || summary.runs > 0) && (
+                    <div className="mt-3 text-[11px] font-semibold tracking-[0.06em]" style={{ color: '#ffd45a' }}>
+                      ★ {summary.totalStars}/{summary.maxStars} · {summary.relics} {summary.relics === 1 ? 'relic' : 'relics'} recovered · {summary.runs} {summary.runs === 1 ? 'run' : 'runs'}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -703,8 +729,17 @@ export default function TempleDash({ onExit }) {
                 <button onClick={() => setWizStep(wizStep + 1)}
                   className="flex-1 py-3 rounded-xl font-black text-white text-lg bg-gradient-to-r from-fire to-magic shadow-glow-fire hover:brightness-110 transition">Next ›</button>
               ) : (
-                <button onClick={() => startCampaign(0)}
-                  className="flex-1 py-3 rounded-xl font-black text-white text-lg bg-gradient-to-r from-fire to-magic shadow-glow-fire hover:brightness-110 transition">▶ Play</button>
+                <div className="flex-1 flex flex-col gap-2">
+                  <button onClick={() => startCampaign(0)}
+                    className="w-full py-3 rounded-xl font-black text-white text-lg bg-gradient-to-r from-fire to-magic shadow-glow-fire hover:brightness-110 transition">▶ {summary.furthest > 0 ? 'New run' : 'Play'}</button>
+                  {summary.furthest > 1 && summary.furthest < 6 && (
+                    <button onClick={() => startCampaign(Math.min(summary.furthest, LEVELS.length - 1))}
+                      className="w-full py-2.5 rounded-xl font-bold text-[#ffe9c8] transition hover:brightness-110"
+                      style={{ background: 'rgba(28,19,11,0.7)', border: '1px solid #ffb45455' }}>
+                      Resume · Level {Math.min(summary.furthest + 1, 6)}
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -882,14 +917,22 @@ function GameOverPanel({ distance, clears, canRevive, reviving, onRevive, onRest
 }
 
 // WIN on a non-last level — gold/green LEVEL COMPLETE, advances keeping lives.
-function LevelCompletePanel({ levelName, lives, onNext, onExit }) {
+function LevelCompletePanel({ levelName, lives, result, onNext, onExit }) {
   return (
     <Overlay bg="rgba(10,12,7,0.82)" border="#9be7a055">
       <div className="font-display font-black text-3xl" style={{ color: '#ffb454', textShadow: '0 2px 16px #000, 0 0 26px #9be7a066' }}>
         LEVEL COMPLETE
       </div>
       <div className="mt-1 text-[13px]" style={{ color: '#9be7a0' }}>{levelName} escaped</div>
-      <div className="mt-2 text-[13px] font-semibold uppercase tracking-[0.14em]" style={{ color: '#ffd99a' }}>
+      {result && (
+        <div className="mt-3 flex flex-col items-center gap-1">
+          <Stars n={result.stars} size={22} />
+          <div className="text-[11px]" style={{ color: '#ffd99a' }}>
+            Best {progress.formatTime(result.best)}{result.isBestTime && <span style={{ color: '#9be7a0' }}> · new best!</span>}
+          </div>
+        </div>
+      )}
+      <div className="mt-3 text-[13px] font-semibold uppercase tracking-[0.14em]" style={{ color: '#ffd99a' }}>
         {lives} {lives === 1 ? 'life' : 'lives'} remaining
       </div>
       <LivesRow lives={lives} />
@@ -902,7 +945,7 @@ function LevelCompletePanel({ levelName, lives, onNext, onExit }) {
 }
 
 // WIN on the LAST level — full victory; Play again resets the campaign.
-function VictoryPanel({ distance, clears, lives, onRestart, onExit }) {
+function VictoryPanel({ distance, clears, lives, summary, onRestart, onExit }) {
   return (
     <Overlay bg="rgba(10,12,7,0.84)" border="#ffd86655">
       <div className="font-display font-black text-3xl" style={{ color: '#ffd866', textShadow: '0 2px 18px #000, 0 0 30px #ffd86677' }}>
@@ -914,6 +957,11 @@ function VictoryPanel({ distance, clears, lives, onRestart, onExit }) {
       <div className="mt-3 text-[15px]" style={{ color: '#ffe9c8' }}>
         {distance} m · {clears} {clears === 1 ? 'clear' : 'clears'} · {lives} {lives === 1 ? 'life' : 'lives'} left
       </div>
+      {summary && (
+        <div className="mt-2 text-[12px]" style={{ color: '#ffd45a' }}>
+          ★ {summary.totalStars}/{summary.maxStars} stars · {summary.relics} {summary.relics === 1 ? 'relic' : 'relics'} recovered
+        </div>
+      )}
       <LivesRow lives={lives} />
       <div className="flex gap-2 justify-center flex-wrap mt-5">
         <PrimaryBtn onClick={onRestart}>Play again</PrimaryBtn>
@@ -1028,7 +1076,20 @@ const JOURNEY_STEPS = [
   { n: 1, label: 'Halls' }, { n: 2, label: 'Blades' }, { n: 3, label: 'The Deep' },
   { n: 4, label: "Lion's Maw" }, { n: 5, label: 'Sunstone', icon: '🏆' }, { n: 6, label: 'Daylight', icon: '🚪' },
 ];
-function LevelJourney({ current }) {
+// Three star sockets — filled gold up to `n`, empty (dim outline) beyond. The
+// empty sockets are the deliberate open loop: the player sees exactly what's left
+// to earn on each level.
+function Stars({ n = 0, size = 9 }) {
+  return (
+    <div className="flex items-center justify-center gap-[1px]" style={{ height: size + 2 }}>
+      {[0, 1, 2].map((i) => (
+        <span key={i} style={{ fontSize: size, lineHeight: 1, color: i < n ? '#ffd45a' : '#ffffff26', textShadow: i < n ? '0 0 5px rgba(255,180,60,0.6)' : 'none' }}>★</span>
+      ))}
+    </div>
+  );
+}
+
+function LevelJourney({ current, starsByLevel = {} }) {
   return (
     <div className="flex items-center justify-center gap-0.5 sm:gap-1 mx-auto">
       {JOURNEY_STEPS.map((s, i) => {
@@ -1036,6 +1097,7 @@ function LevelJourney({ current }) {
         const bg = done ? '#e8a33a' : cur ? 'rgba(255,180,60,0.18)' : 'rgba(28,19,11,0.6)';
         const bd = done ? '#ffd45a' : cur ? '#ffd45a' : '#ffffff1f';
         const fg = done ? '#1c1208' : cur ? '#ffe6a4' : '#8a765a';
+        const stars = starsByLevel[i] || 0;
         return (
           <div key={s.n} className="flex items-center">
             <div className="flex flex-col items-center" style={{ width: 46 }}>
@@ -1049,9 +1111,10 @@ function LevelJourney({ current }) {
                 {done ? '✓' : (s.icon || s.n)}
               </div>
               <div className="text-[8px] uppercase tracking-[0.08em] mt-1 font-bold" style={{ color: fg }}>{s.label}</div>
+              <div className="mt-0.5"><Stars n={stars} size={8} /></div>
             </div>
             {i < JOURNEY_STEPS.length - 1 && (
-              <div style={{ width: 10, height: 2, background: done ? '#ffd45a' : '#ffffff1f', marginTop: -14 }} />
+              <div style={{ width: 10, height: 2, background: done ? '#ffd45a' : '#ffffff1f', marginTop: -22 }} />
             )}
           </div>
         );
