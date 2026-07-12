@@ -1,0 +1,31 @@
+{
+  "name": "Temple Collapse — Level 5: The Sunstone",
+  "mode": "maze",
+  "ending": "artifact",
+  "params": {
+    "hallWidth": 12,
+    "hallHeight": 7,
+    "hallLen": 18,
+    "exitLen": 18,
+    "runSpeed": 11,
+    "startGrace": 5,
+    "collapseTime": 88,
+    "paceMargin": 1.14,
+    "readTime": 4,
+    "ending": "artifact"
+  },
+  "junctions": [
+    { "correct": "R", "len": 24, "hazards": [ { "type": "beam", "at": 0.5 } ] },
+    { "correct": "L", "len": 22, "hazards": [ { "type": "fire", "mode": "jump", "at": 0.42 }, { "type": "blade", "at": 0.7 } ] },
+    { "correct": "L", "len": 26, "hazards": [ { "type": "crack", "at": 0.4 } ] },
+    { "correct": "R", "len": 22, "hazards": [ { "type": "blade", "at": 0.35 }, { "type": "fire", "mode": "duck", "at": 0.68 } ] },
+    { "correct": "R", "len": 24, "hazards": [ { "type": "beam", "at": 0.3 }, { "type": "crack", "at": 0.66 } ] },
+    { "correct": "L", "len": 22, "hazards": [ { "type": "fire", "mode": "jump", "at": 0.45 } ] },
+    { "correct": "R", "len": 26, "hazards": [ { "type": "blade", "at": 0.32 }, { "type": "beam", "at": 0.7 } ] },
+    { "correct": "L", "len": 22, "hazards": [ { "type": "crack", "at": 0.4 }, { "type": "fire", "mode": "duck", "at": 0.72 } ] },
+    { "correct": "L", "len": 24, "hazards": [ { "type": "blade", "at": 0.5 } ] },
+    { "correct": "R", "len": 22, "hazards": [ { "type": "beam", "at": 0.3 }, { "type": "blade", "at": 0.68 } ] },
+    { "correct": "R", "len": 26, "hazards": [ { "type": "fire", "mode": "jump", "at": 0.35 }, { "type": "crack", "at": 0.7 } ] },
+    { "correct": "L", "len": 22, "hazards": [ { "type": "blade", "at": 0.4 }, { "type": "beam", "at": 0.72 } ] }
+  ]
+}

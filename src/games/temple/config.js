@@ -17,7 +17,13 @@
 import { assetUrl } from './assetUrl.js';
 export const ASSETS = {
   corridor: assetUrl('assets/temple/corridor_dark.webp'),
+  // TIP-NODE look (ported from the level1 prototype): a brighter one-point-
+  // perspective hall photo projected from a node field, plus a carved-arch
+  // doorway PANEL (solid wall + transparent arched hole) placed on open sides.
+  corridorBright: assetUrl('assets/temple/corridor_bright.webp'),
+  doorwayPanel: assetUrl('assets/temple/doorway_panel.webp'),   // alpha cutout (webp keeps the transparency)
   boulder: assetUrl('assets/temple/boulder_hero.webp'),
+  door: assetUrl('assets/temple/stone_door.webp'),   // carved sun-lion exit door (real alpha)
   // sprite frame counts (r_00..r_NN.png), zero-padded to 2 digits.
   run: { dir: assetUrl('assets/temple/char/run'), count: 19 },   // tightened run cycle (cut frames 8-20 of the 32-frame original; kept 21)
   jump: { dir: assetUrl('assets/temple/char/jump'), count: 24 },
@@ -66,6 +72,17 @@ export const ALIGN_PRESETS = [
   // heels, menacing), runner normal size, minimal gap, maximum threat.
   { avatarScale: 1.0,  avatarLift: 0.0,  boulderScale: 1.5,  peekFar: 0.52, peekNear: 0.40 },
 ];
+
+// ---- GRID WORLD (the true-maze engine) --------------------------------------
+// The grid engine builds the 3D world and the minimap from the SAME grid, so
+// every corridor on the map is walkable. cellW is the world size of one maze
+// cell (corridor width AND cell pitch — buildGridWorld carves square cells).
+// It is the single source for pacing too: mazeGen derives each level's collapse
+// budget from (routeSteps * GRID.cellW) / runSpeed, so world scale and timer
+// can never drift apart.
+export const GRID = {
+  cellW: 14,          // world units per maze cell (corridor width = cell pitch)
+};
 
 // ---- CORRIDOR SURFACING MODE (A/B) -----------------------------------------
 // 'tip'   = the default photoreal TIP (projected-photo) corridor (unchanged).

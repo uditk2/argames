@@ -27,11 +27,12 @@ import { drawMinimap } from './minimap.js';
 import { createBoulderFx } from './boulderFx.js';
 import { createRoute } from './route.js';
 import { createCollapse } from './collapse.js';
+import { createAudio } from './audio.js';
 
 // World direction basis used by the prototype's `place()` — q indexes a heading.
 const WD = makeWD(THREE);
 
-export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, onState, runToMove } = {}) {
+export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, onState, onStall, runToMove } = {}) {
   // ---- resolve map params (fall back to defaults per-field) ----
   const mp = { ...MAP_DEFAULTS, ...(map && map.params ? map.params : {}) };
   // RUN-TO-MOVE: forward motion is gated on a held RUN input (see input('runStart'/'runStop')).
@@ -44,6 +45,10 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
   const GRACE_S = mp.startGrace != null ? mp.startGrace : PLAY.graceS;
   // per-level COLLAPSE budget (seconds): map params, falling back to the config default.
   const COLLAPSE_S = mp.collapseTime != null ? mp.collapseTime : MAP_DEFAULTS.collapseTime;
+  // LEVEL ENDING: 'door' (default, L1-L4 stone door), 'artifact' (L5 — take the Sunstone),
+  // or 'exit' (L6 — burst into daylight). Drives the end-of-run visual + win message.
+  const ENDING = (map && map.ending) || mp.ending || 'door';
+  const WIN_CUE = ENDING === 'artifact' ? 'THE SUNSTONE!' : ENDING === 'exit' ? 'DAYLIGHT!' : 'ESCAPE!';
   // ---- MAZE MODE (opt-in) ----------------------------------------------------
   // The engine has two route builders. The DEFAULT (linear) builds a fixed chain
   // of L-shaped units from `map.segments` (only the correct side opens; judge the
@@ -65,6 +70,12 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
 
   // ---- three.js core ----
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+  // Max anisotropic filtering — the default (1) smears wall/floor textures at the
+  // grazing angles a runner spends most of its time looking at. (Issue #7.)
+  const MAX_ANISO = renderer.capabilities.getMaxAnisotropy ? renderer.capabilities.getMaxAnisotropy() : 8;
+  // Mipmaps on the TIP photo enable the hybrid shader's blurred-photo lighting lookup
+  // (texture2D(uImg,uv,5.0)). Only on WebGL2 — the photo is NPOT, which can't mipmap on WebGL1.
+  const HAS_MIPS = !!renderer.capabilities.isWebGL2;
   renderer.setSize(canvas.clientWidth || window.innerWidth, canvas.clientHeight || window.innerHeight);
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   const scene = new THREE.Scene();
@@ -89,18 +100,27 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
 
   // ---- corridor (TIP-projected photoreal texture, same shader as prototype) --
   const _texLoader = new THREE.TextureLoader();
-  const img = _texLoader.load(ASSETS.corridor);
-  img.minFilter = THREE.LinearFilter; img.magFilter = THREE.LinearFilter;
+  // TIP photos: once the async load resolves, push the REAL pixel dims into the
+  // shared uImgSize vector (created lazily by mkMat via texture.userData.__imgSize)
+  // so the hybrid shader's texel-stretch estimate is exact (§7a: set after onLoad).
+  const _tipSizeOnLoad = (t) => {
+    if (t && t.image && t.userData && t.userData.__imgSize) t.userData.__imgSize.set(t.image.width, t.image.height);
+  };
+  const img = _texLoader.load(ASSETS.corridor, _tipSizeOnLoad);
+  img.minFilter = HAS_MIPS ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter; img.generateMipmaps = HAS_MIPS;
+  img.magFilter = THREE.LinearFilter; img.anisotropy = MAX_ANISO;
   // OFF-PROJECTION FALLBACK tile (tiling stone) for the TIP shader, so surfaces outside a
   // hall's projection render as dark textured stone, not a flat black/tan box at turns.
   const fallbackTile = _texLoader.load(ASSETS.texWall);
   fallbackTile.wrapS = fallbackTile.wrapT = THREE.RepeatWrapping;
   fallbackTile.minFilter = THREE.LinearMipmapLinearFilter; fallbackTile.magFilter = THREE.LinearFilter;
+  fallbackTile.anisotropy = MAX_ANISO;
   if ('colorSpace' in fallbackTile) fallbackTile.colorSpace = THREE.SRGBColorSpace;
   // Photoreal sunlit EXIT corridor texture (TIP-projected onto the appended final
   // hall — Option A). Same aspect/style as `img`; sRGB so the golden archway reads.
-  const exitImg = _texLoader.load(ASSETS.exitImg);
-  exitImg.minFilter = THREE.LinearFilter; exitImg.magFilter = THREE.LinearFilter;
+  const exitImg = _texLoader.load(ASSETS.exitImg, _tipSizeOnLoad);
+  exitImg.minFilter = HAS_MIPS ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter; exitImg.generateMipmaps = HAS_MIPS;
+  exitImg.magFilter = THREE.LinearFilter; exitImg.anisotropy = MAX_ANISO;
   if ('colorSpace' in exitImg) exitImg.colorSpace = THREE.SRGBColorSpace;
 
   // ---- photoreal hazard textures (keyed PNGs mapped onto the prop geometry,
@@ -211,7 +231,10 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
     mat: (kind, tipMat) => (TILED ? surfMat(kind) : tipMat),
     uv: (across, along) => (TILED ? uvFor(across, along) : undefined),
     matExit: (kind, tipMat) => (TILED ? surfMat(kind) : tipMat),
-    exitImg,
+    // Bright sunlit exit only for the true DAYLIGHT escape (L6). For the stone-door
+    // and artifact endings the exit space is the SAME dark photoreal corridor — the
+    // door seals you into darkness, no bright daylight bleed.
+    exitImg: (ENDING === 'exit') ? exitImg : img,
     exitCorridorLen: EXIT.corridorLen,
     // warm point-light hook so the route can drop a subtle torch glow at each
     // junction's open archway (draws the eye to the correct turn). Routed through
@@ -262,6 +285,61 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
   const bladeEdgeMat = new THREE.MeshBasicMaterial({ color: 0xffd86a });
   const chainMat = new THREE.MeshStandardMaterial({ color: 0x33302a, roughness: 0.7, metalness: 0.8 });
   const shadowMat = new THREE.MeshBasicMaterial({ color: 0x000000, transparent: true, opacity: 0.42 });
+
+  // ---- STONE DOOR (level ending) --------------------------------------------
+  // A carved slab that DESCENDS across the exit as the collapse timer drains. To
+  // escape you DUCK under it; the lower it is, the more you must duck. It never
+  // fully closes — the gap floors at DUCK_GAP, so "just before collapse it's still
+  // wide enough to duck through." Placed just inside the exit archway.
+  const DOOR = {
+    setback: 3.4,            // world units before the archway end
+    openGap: H * 0.92,       // gap under the door when the timer is full (walk through)
+    duckGap: H * 0.34,       // gap when fully descended (must duck; never lower)
+    needGap: H * 0.66,       // below this you MUST be ducking to pass
+    duckWindow: 480,         // ms after a duck press that counts as "ducking"
+  };
+  let doorMesh = null, doorPos = null, doorGap = DOOR.openGap, doorPassed = false, doorCued = false, duckUntil = -1;
+  const DOOR_H = H * 1.4;   // door plane height — tall so its top hides above the ceiling
+  if (exitCorridorInfo && ENDING === 'door') {
+    const dir = exitCorridorInfo.outDir.clone().setY(0).normalize();
+    doorPos = exitCorridorInfo.farEnd.clone().addScaledVector(dir, -DOOR.setback);
+    // The SAME photoreal corridor stone as the walls, kept DARK — a heavy blast slab
+    // that matches the game, not a bright carved relief. Opaque (whole plane is solid
+    // stone); it translates down, its top hiding above the ceiling.
+    const doorTex = _texLoader.load(ASSETS.texWall);
+    doorTex.wrapS = doorTex.wrapT = THREE.RepeatWrapping; doorTex.repeat.set(2.4, 2.4);
+    doorTex.minFilter = HAS_MIPS ? THREE.LinearMipmapLinearFilter : THREE.LinearFilter; doorTex.generateMipmaps = HAS_MIPS;
+    doorTex.anisotropy = MAX_ANISO;
+    if ('colorSpace' in doorTex) doorTex.colorSpace = THREE.SRGBColorSpace;
+    const doorMat = new THREE.MeshBasicMaterial({ map: doorTex, color: 0x2a2016, side: THREE.DoubleSide, depthWrite: true });
+    doorMesh = new THREE.Mesh(new THREE.PlaneGeometry(W + 0.4, DOOR_H), doorMat);
+    doorMesh.rotation.y = Math.atan2(dir.x, dir.z);
+    doorMesh.renderOrder = 5;
+    doorMesh.position.set(doorPos.x, DOOR.openGap + DOOR_H / 2, doorPos.z);
+    scene.add(doorMesh);
+  }
+  // Lower the door each frame as the collapse timer drains (bottom edge = doorGap).
+  function updateDoor() {
+    if (!doorMesh) return;
+    const prog = Math.max(0, Math.min(1, 1 - collapse.remaining() / Math.max(1, BUDGET_S)));
+    doorGap = DOOR.openGap + (DOOR.duckGap - DOOR.openGap) * prog;   // lowers as time runs out
+    doorMesh.position.y = doorGap + DOOR_H / 2;
+    if (prog > 0.3 && phase === 'run') audio.doorGrind(prog);   // grinding stone as it descends
+    // Warn the player once when they reach the exit corridor and the door is low
+    // enough that they'll need to DUCK to slip under it.
+    if (phase === 'run' && !doorPassed && !doorCued && doorGap < DOOR.needGap
+        && route.resolvedCount >= (map && map.junctions ? map.junctions.length : 0)) {
+      doorCued = true; cue('DUCK — DOOR LOW', '#ffd23a');
+    }
+  }
+  // Gate the win on ducking under a low door. Returns true if the player may escape
+  // now; false means they hit the door (caller stumbles them into a DUCK).
+  function doorClear() {
+    if (!doorMesh || doorPassed) return true;
+    if (doorGap >= DOOR.needGap) { doorPassed = true; return true; }   // high enough — walk through
+    if (performance.now() < duckUntil) { doorPassed = true; return true; }  // ducking — slip under
+    return false;                                                       // too low + upright — blocked
+  }
 
   const unitPlace = (lx, ly, lz, uf) => P(lx, ly, lz, uf.o, uf.q);
   function unitQuat(uf) {
@@ -488,9 +566,23 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
   // Bounds + layout come from the route (it owns the immutable correct path, the
   // maze dim stubs and the pit tails). The ACTIVE polyline (route.waypoints) is the
   // live player-driven path, so the linear minimap follows a turn (or pit) as it splices.
-  const mx = minimapCanvas ? minimapCanvas.getContext('2d') : null;
+  // LATE-ATTACH: the React HUD mounts the minimap <canvas> on the same render
+  // that creates the engine, so on the FIRST level it may not exist yet (the
+  // L1 "black map" bug). Keep the canvas + ctx mutable and expose
+  // setMinimapCanvas() so the ref callback can attach it whenever it mounts.
+  let mmCanvas = minimapCanvas || null;
+  let mx = mmCanvas ? mmCanvas.getContext('2d') : null;
+  function setMinimapCanvas(c) {
+    mmCanvas = c || null;
+    mx = mmCanvas ? mmCanvas.getContext('2d') : null;
+    if (mx) drawMM(s);   // paint immediately (don't wait a frame — study panel may be up)
+  }
   const mmBounds = route.mmBounds;
   const mazeSegments = route.mazeSegments;
+  // Length of the full correct route → CONTINUOUS minimap-dot progress (the marker
+  // slides as the player moves, instead of only jumping forward at each junction).
+  let mmFullLen = 0;
+  { const cw = route.correctWaypoints || []; for (let i = 0; i < cw.length - 1; i++) mmFullLen += cw[i + 1].distanceTo(cw[i]); }
   // Hazard map-anchors (world x/z of every placed trap) so the minimap can drop
   // legend icons on the maze — beams, blades, fire jets and crumbling floor.
   const mmHazards = {
@@ -505,8 +597,10 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
     const aS = clampS(sv + dir * SCHAR);
     const p0 = ptAt(aS), p1 = ptAt(clampS(aS + dir * 1.6));
     drawMinimap(mx, {
-      canvas: minimapCanvas, maze: MAZE, bounds: mmBounds,
+      canvas: mmCanvas, maze: MAZE, bounds: mmBounds,
       waypoints: route.waypoints, correctWaypoints, junctionStubs, mazeSegments, hazards: mmHazards,
+      // FULL grid labyrinth for the map (all corridors/dead-ends), + progress for the dot.
+      gridView: (map && map.grid) ? { grid: map.grid, path: map.path, hazardCells: map.hazardCells, progress: Math.max(0, Math.min(1, route.sAtFull(p0) / Math.max(1, mmFullLen))) } : null,
       // the dot tracks the AVATAR (sv + the in-travel-direction lead), so it follows a
       // wrong-branch excursion and the back-out, matching what the player sees.
       pos: p0,
@@ -534,7 +628,32 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
   // run begins (grace over), ticks it in the run loop, exposes remaining() via
   // onState, and triggers the collapse death on expiry. It exposes a shake the
   // engine threads into the 3D camera (same pattern as boulderFx).
-  const collapse = createCollapse({ COLLAPSE, budgetS: COLLAPSE_S });
+  // AUTO-PACING: when a level sets params.paceMargin, DERIVE the collapse budget
+  // from the SHORTEST route so wandering a much bigger route TRAPS the player.
+  // The timer is PAUSED during startGrace (the player auto-runs for free during
+  // it), so the budget only needs to cover the route length that remains AFTER the
+  // free grace distance:
+  //     graceDist        = runSpeed * startGrace           (covered for free)
+  //     underTimerTime   = (optimalRouteLen - graceDist) / runSpeed
+  //     budget           = underTimerTime * paceMargin + paceBuffer
+  // paceMargin is now a TIGHT tolerance over the shortest route (~1.10 = only 10%
+  // slack -> only near-optimal routing survives; the longest route is NOT afforded).
+  // Ramp it: calm early (~1.30) -> tense late (~1.10). Falls back to the authored
+  // collapseTime when paceMargin is absent (backward compatible).
+  function fullRouteLen() {
+    const cw = route.correctWaypoints; let L = 0;
+    for (let i = 0; i < cw.length - 1; i++) L += cw[i + 1].distanceTo(cw[i]);
+    return L;
+  }
+  const PACE_MARGIN = mp.paceMargin;
+  let BUDGET_S = COLLAPSE_S;
+  if (PACE_MARGIN != null && isFinite(PACE_MARGIN) && PACE_MARGIN > 0) {
+    const graceDist = SPD * GRACE_S;
+    const underTimerTime = Math.max(0, (fullRouteLen() - graceDist) / SPD);
+    BUDGET_S = Math.max(8, Math.round(underTimerTime * PACE_MARGIN + (mp.paceBuffer != null ? mp.paceBuffer : 3)));
+  }
+  const collapse = createCollapse({ COLLAPSE, budgetS: BUDGET_S });
+  const audio = createAudio();   // procedural Web Audio SFX + collapse-rumble bed
 
   // ---- game state ------------------------------------------------------------
   const TURN_WIN = PLAY.turnWin, HAZ_WIN = PLAY.hazWin;
@@ -543,12 +662,16 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
   const LEAD = PLAY.cueLead != null ? PLAY.cueLead : 16;    // telegraph distance
   const SCHAR = CAM.charAhead;                              // judge at the AVATAR, not the camera
   let s = 0, last = performance.now(), raf = 0, running = false;
+  // READING HOLD: while true, the scene + minimap render but the player can't move
+  // and the collapse timer can't arm — a "study the map" beat before the run starts.
+  let readingHold = false;
   let phase = 'ready';        // 'ready' | 'run' | 'stuck' | 'over' | 'won'
   let clears = 0;
   let winT = 0;               // seconds since the ESCAPE (drives the win whiteout flash + ease)
   let boulderHeat = 0;
   let deathCause = null;      // 'blade' | 'boulder' | 'turn' | 'blocked' | 'pit' | 'collapse'
   let stuckT = 0, sliceT = 0; // beam-stumble timer / blade-slice timer
+  let stuckWarned = false;    // one-shot escalation cue while stuck (the hidden fuse is burning)
   let stuckAction = 'jump';   // which move recovers the current stumble ('jump' | 'duck')
   // ---- COLLAPSE arming -------------------------------------------------------
   // The countdown must start at the moment the run ACTUALLY begins — i.e. when the
@@ -625,7 +748,7 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
   const turnDone = sTurn.map(() => false), turnArmed = sTurn.map(() => false);
   const beamArmed = sBeam.map(() => false), bladeArmed = sBlade.map(() => false);
 
-  const state = { distance: 0, clears: 0, phase: 'ready', cause: null, falling: false, timeLeft: COLLAPSE_S, timeUrgent: false, timeArmed: false };
+  const state = { distance: 0, clears: 0, phase: 'ready', cause: null, falling: false, timeLeft: BUDGET_S, timeUrgent: false, timeArmed: false };
   function pushState() {
     state.distance = Math.floor(s * PLAY.metresPerUnit);
     state.clears = clears; state.phase = phase; state.cause = deathCause; state.falling = falling;
@@ -663,6 +786,8 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
     beamDone.fill(false); bladeDone.fill(false); turnDone.fill(false); turnArmed.fill(false);
     beamArmed.fill(false); bladeArmed.fill(false); fireDone.fill(false); crackDone.fill(false);
     fireArmed.fill(false); crackArmed.fill(false); stuckAction = 'jump';
+    doorPassed = false; doorCued = false; duckUntil = -1;   // reset the exit stone door for the new run
+    audio.ambient(false);                 // silence the rumble bed until the run re-arms
     // reset avatar FX transforms
     avatarMat.opacity = 1; avatar.scale.set(1, 1, 1);
     // reset crush cinematics (crushT/escapeT/dust/shake/impact all live in fx)
@@ -673,7 +798,7 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
   // failed the FIRST turn) the boulder rolls in and crushes them; once it's dropped
   // (post-first-turn) this is a plain wall-impact death (no boulder — gated by
   // `boulderDropped` in drawOverlay's `crushing`).
-  function die(cause) { if (phase === 'over') return; phase = 'over'; deathCause = cause || 'turn'; fx.clearCrush(); pushState(); }
+  function die(cause) { if (phase === 'over') return; phase = 'over'; deathCause = cause || 'turn'; fx.clearCrush(); audio.ambient(false); audio.die(deathCause); pushState(); }
   // BLADE = nasty instant kill: immediate over, red slice flash, avatar topples.
   // dieBlade fires only from 'run' (instant slice), where dust is empty + impactTime
   // is -1, so fx.clearCrush() (crushT=0 + dust/impact clear) is equivalent to the
@@ -692,7 +817,8 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
   function getStuck(action) {
     if (phase !== 'run') return;
     stuckAction = action || 'jump';
-    phase = 'stuck'; deathCause = null; stuckT = 0; fx.clearCrush(); setAnim('run');
+    phase = 'stuck'; deathCause = null; stuckT = 0; stuckWarned = false; fx.clearCrush(); setAnim('run');
+    audio.stumble();
     cue(stuckAction === 'duck' ? 'DUCK!' : 'JUMP!', '#ffd23a'); pushState();
   }
   // Recover from a stumble: the CORRECT move (the one that would have cleared the hazard)
@@ -724,19 +850,21 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
     if (phase === 'over') return;
     phase = 'over'; deathCause = 'collapse';
     boulderGone = true; boulderDropped = true; boulderHeat = 0;
-    fx.clearCrush(); collapse.trigger(); pushState();
+    fx.clearCrush(); collapse.trigger(); audio.ambient(false); audio.die('collapse'); pushState();
   }
 
   function setAnim(name) { anim = name; animT = 0; animFrame = 0; }
 
   // ---- input -----------------------------------------------------------------
+  // Reward feedback on a clean hazard clear — a bright ding + a brief ✓ (juice).
+  function onClear() { audio.clear(); cue('✓', '#9be7a0'); }
   function judgeAction(arr, done, kind) {
     const sp = s + SCHAR;                 // the avatar's position is what the player sees at the hazard
     for (let i = 0; i < arr.length; i++) {
       if (done[i]) continue;
       if (Math.abs(sp - arr[i]) <= HAZ_WIN) {
         done[i] = true; clears++; boulderHeat = Math.max(0, boulderHeat - 0.5);
-        pushState(); return;   // no "JUMP!/DUCK!" prompt — clearing it is its own feedback
+        onClear(); pushState(); return;
       }
     }
   }
@@ -746,7 +874,7 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
     for (let i = 0; i < sFire.length; i++) {
       if (fireDone[i]) continue;
       if (sFire[i].duck === wantDuck && Math.abs(sp - sFire[i].s) <= HAZ_WIN) {
-        fireDone[i] = true; clears++; pushState(); return;
+        fireDone[i] = true; clears++; onClear(); pushState(); return;
       }
     }
   }
@@ -756,7 +884,7 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
     const sp = s + SCHAR;
     for (let i = 0; i < sCrack.length; i++) {
       if (crackDone[i]) continue;
-      if (sp >= sCrack[i] - CRACK_HALF - HAZ_WIN && sp <= sCrack[i] + CRACK_HALF + 1) { crackDone[i] = true; clears++; pushState(); return; }
+      if (sp >= sCrack[i] - CRACK_HALF - HAZ_WIN && sp <= sCrack[i] + CRACK_HALF + 1) { crackDone[i] = true; clears++; onClear(); pushState(); return; }
     }
   }
   // ---- PLAYER-DRIVEN TURN (unified linear + maze) ----------------------------
@@ -785,6 +913,7 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
           // back to 0 as the (now-spliced) bend rounds the corner (- = left, + = right).
           const tdir = (dir === 'L') ? -1 : 1;
           turnLeanV = (Math.abs(turnLeanV) < TURN.kick ? TURN.kick : Math.abs(turnLeanV)) * tdir;
+          audio.turn();
           pushState();
         } else if (r === 'pit') {
           // Wrong direction: the bend is NOT spliced — the straight pit stub stands and
@@ -798,6 +927,10 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
     }
   }
   function input(action) {
+    if (readingHold) return;   // studying the map — ignore all gameplay input
+    audio.resume();            // first gesture unlocks Web Audio
+    // DUCK also arms the "ducking" window used to slip under the descending exit door.
+    if (action === 'duck') duckUntil = performance.now() + DOOR.duckWindow;
     // RUN-TO-MOVE: hold the run input to advance (released = stop). Works in any phase.
     if (action === 'runStart') { runHeld = true; return; }
     if (action === 'runStop') { runHeld = false; return; }
@@ -807,8 +940,8 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
     // STUMBLE: the run is stopped at a beam/fire — the correct move (jump or duck) frees
     // it. Other input is ignored while stumbling. Never costs a life.
     if (phase === 'stuck') { if (action === 'jump' || action === 'duck') recover(action); return; }
-    if (action === 'jump') { hopV = Math.max(hopV, PLAY.hopV); setAnim('jump'); judgeAction(sBeam, beamDone, 'jump'); judgeFire(false); judgeCrack(); }
-    else if (action === 'duck') { dipV = Math.max(dipV, PLAY.dipV); setAnim('duck'); judgeAction(sBlade, bladeDone, 'duck'); judgeFire(true); }
+    if (action === 'jump') { hopV = Math.max(hopV, PLAY.hopV); setAnim('jump'); audio.jump(); judgeAction(sBeam, beamDone, 'jump'); judgeFire(false); judgeCrack(); }
+    else if (action === 'duck') { dipV = Math.max(dipV, PLAY.dipV); setAnim('duck'); audio.duck(); judgeAction(sBlade, bladeDone, 'duck'); judgeFire(true); }
     else if (action === 'left') { MAZE ? judgeTurnMaze('L') : judgeTurn('L'); }
     else if (action === 'right') { MAZE ? judgeTurnMaze('R') : judgeTurn('R'); }
   }
@@ -830,7 +963,7 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
     if (mazeWall && route.onWrongBranch()) {
       s += 2 * SCHAR;
       backing = true; dir = -1; mazeWall = false; camBlend = CAM_BLEND_S;
-      setAnim('run'); cue('DOUBLE BACK', '#ffd99a'); pushState();
+      setAnim('run'); audio.back(); cue('DOUBLE BACK', '#ffd99a'); pushState();
       return;
     }
     const t = sTurn[i];
@@ -863,7 +996,19 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
   function animate() {
     if (!running) return;
     const now = performance.now();
-    const dt = Math.min(50, now - last) / 1000; last = now;
+    const rawMs = now - last; last = now;
+    // rAF STARVATION GUARD: if frames stop arriving (window occluded WITHOUT a
+    // visibilitychange — capture rigs, fully-covered windows, heavy throttling),
+    // clamped-dt integration would turn the run into slow-motion mush with a
+    // frozen timer. Instead: skip the sim entirely for the stalled frame and tell
+    // the host (which hard-pauses with a PAUSED overlay). Only mid-run — menus,
+    // reading holds and end screens don't care about big gaps.
+    if (rawMs > 600 && phase === 'run' && !readingHold) {
+      if (onStall) onStall();               // host normally hard-pauses (running -> false)
+      if (!running) return;
+      raf = requestAnimationFrame(animate); return;   // no host pause: freeze sim, keep looping
+    }
+    const dt = Math.min(50, rawMs) / 1000;
     const tnow = now * 0.001;
 
     // Swing the pendulum with a WIDE amplitude so the motion clearly reads at speed
@@ -882,8 +1027,8 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
     // GRACE_S done). We detect that by the AVATAR arc-length crossing GRACE_S.
     // RUN-TO-MOVE: the arc may never reach GRACE_S if the player dawdles, so also arm the
     // countdown the moment they first start running — then the clock drains even if they stop.
-    if (!collapseArmed && phase === 'run' && !falling && ((s + SCHAR) >= GRACE_S || (RUN2MOVE && runHeld))) {
-      collapseArmed = true; collapse.arm();
+    if (!collapseArmed && !readingHold && phase === 'run' && !falling && ((s + SCHAR) >= GRACE_S || (RUN2MOVE && runHeld))) {
+      collapseArmed = true; collapse.arm(); audio.ambient(true);
     }
     // Tick while the run is live (running forward) OR blocked at a beam (the fuse
     // burns while stuck). `active` is true only when the player is actually in the
@@ -896,12 +1041,18 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
         // it as an ESCAPE rather than a collapse death (Issue: a few feet from the exit
         // shouldn't cost a life). Otherwise the temple comes down.
         if (route.reachedExit(s + SCHAR, EXIT.timeGrace)) {
-          phase = 'won'; winT = 0; setAnim('run'); cue('BARELY!', '#ffe08a'); pushState();
+          phase = 'won'; winT = 0; setAnim('run'); audio.ambient(false); (ENDING === 'artifact' ? audio.pickup() : audio.win()); cue('BARELY!', '#ffe08a'); pushState();
         } else {
           dieCollapse();
         }
       }
     }
+
+    // STONE DOOR + AUDIO: lower the exit door and drive the ambient danger swell +
+    // pace-synced footfalls each frame.
+    updateDoor();
+    audio.danger(Math.max(0, Math.min(1, 1 - collapse.remaining() / Math.max(1, BUDGET_S))));
+    audio.tickFeet(dt, phase === 'run' && avatarMoving);
 
     if (phase === 'run' && falling) {
       // FALLING off a pit edge: freeze forward progress, accumulate the drop timer, and
@@ -912,7 +1063,8 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
     } else if (phase === 'run') {
       const total = route.total;
       // RUN-TO-MOVE: forward/back motion only while the RUN input is held. (Auto-run when off.)
-      const moveOK = (!RUN2MOVE || runHeld);
+      // READING HOLD also freezes motion (study-the-map beat before the run).
+      const moveOK = (!RUN2MOVE || runHeld) && !readingHold;
       avatarMoving = moveOK && !mazeWall;   // idle the run cycle when stopped / at a wall
       if (MAZE) {
         // ---- MAZE MOVEMENT: dead-end walls + back-out (NO pits/falls) -------------
@@ -935,12 +1087,15 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
           const sp0 = s + SCHAR;
           if (route.reachedExit(sp0, EXIT.stop)) {
             s = Math.min(s, total - SCHAR - 0.05);
-            phase = 'won'; winT = 0; setAnim('run'); cue('ESCAPE!', '#ffe08a'); pushState();
+            if (doorClear()) { phase = 'won'; winT = 0; setAnim('run'); audio.ambient(false); (ENDING === 'artifact' ? audio.pickup() : audio.win()); cue(WIN_CUE, '#ffe08a'); pushState(); }
+            else { getStuck('duck'); }   // the exit door is too low — DUCK to slip under it
           } else if (sp0 >= route.tailWallS() - WALL_STOP) {
-            // bumped a wall: the straight far wall (must turn) or a dead-end wall (back out).
+            // Run up to the wall and stop (face it). No auto-reverse — the player backs
+            // out themselves with a turn. Prompt "WHICH WAY?" only at a real straight-wall
+            // junction; a dead end reads itself on the moving minimap.
             s = route.tailWallS() - SCHAR - WALL_STOP;
             mazeWall = true; setAnim('run');
-            cue(route.onWrongBranch() ? 'DEAD END' : 'WHICH WAY?', route.onWrongBranch() ? '#ff3b30' : '#ffd23a');
+            if (!route.onWrongBranch()) cue('WHICH WAY?', '#ffd23a');
             pushState();
           }
         }
@@ -954,8 +1109,8 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
           startFall();
         } else if (route.reachedExit(sp0, EXIT.stop)) {
           s = Math.min(s, total - SCHAR - 0.05);
-          phase = 'won'; winT = 0; setAnim('run'); cue('ESCAPE!', '#ffe08a');
-          pushState();
+          if (doorClear()) { phase = 'won'; winT = 0; setAnim('run'); cue(WIN_CUE, '#ffe08a'); pushState(); }
+          else { getStuck('duck'); }   // the exit door is too low — DUCK to slip under it
         }
       }
       // ---- shared HAZARD checks (only while running FORWARD on the floor) --------
@@ -1035,6 +1190,9 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
       // This NEVER becomes a death — only the collapse countdown (ticking above) ends a
       // run. stuckT just drives the stumble pose. (No boulder crush, no fuse.)
       stuckT += dt;
+      // ESCALATE: the block quietly burns the collapse fuse — surface it so the player
+      // isn't killed with no warning. Re-cue the freeing move, loud + red, after ~0.9s.
+      if (stuckT > 0.9 && !stuckWarned) { stuckWarned = true; cue(stuckAction === 'duck' ? 'DUCK — NOW!' : 'JUMP — NOW!', '#ff2e22'); }
     } else if (phase === 'over' && (deathCause === 'blade' || deathCause === 'fire')) {
       sliceT += dt;   // drives the slice/burn flash + topple
     } else if (phase === 'over' && boulderDropped) {
@@ -1264,6 +1422,10 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
     raf = requestAnimationFrame(animate);
   }
   function stop() { running = false; if (raf) cancelAnimationFrame(raf); raf = 0; }
+  // Pause/resume the loop WITHOUT resetting the run (used on tab-hide so the game
+  // doesn't slide into slow-motion / spring instability while backgrounded).
+  function pauseLoop() { if (!running) return; running = false; if (raf) cancelAnimationFrame(raf); raf = 0; }
+  function resumeLoop() { if (running) return; running = true; last = performance.now(); raf = requestAnimationFrame(animate); }
   function dispose() {
     stop();
     try { renderer.dispose(); } catch {}
@@ -1284,7 +1446,13 @@ export function createTempleEngine({ canvas, fxCanvas, minimapCanvas, map, onCue
   }
 
   return {
-    start, stop, dispose, input, resize,
+    start, stop, dispose, input, resize, pauseLoop, resumeLoop, setMinimapCanvas,
+    setMuted(v) { return audio.setMuted(v); },
+    toggleMuted() { return audio.toggleMuted(); },
+    get muted() { return audio.muted; },
+    setReadingHold(v) { readingHold = !!v; },
+    get readingHold() { return readingHold; },
+    get budgetS() { return BUDGET_S; },
     get state() { return { ...state }; },
     get phase() { return phase; },
   };

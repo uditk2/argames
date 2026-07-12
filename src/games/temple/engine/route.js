@@ -118,6 +118,7 @@ export function createRoute({
     const t = _ctl.load(url);
     t.wrapS = THREE.RepeatWrapping; t.wrapT = THREE.RepeatWrapping;
     t.minFilter = THREE.LinearMipmapLinearFilter; t.magFilter = THREE.LinearFilter;
+    t.anisotropy = 16;   // sharpen grazing-angle corridor stone (clamped to GPU max)
     if ('colorSpace' in t) t.colorSpace = THREE.SRGBColorSpace;
     return new THREE.MeshBasicMaterial({ map: t, color: tint, side: THREE.DoubleSide });
   };

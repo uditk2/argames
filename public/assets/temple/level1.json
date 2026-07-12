@@ -8,11 +8,17 @@
     "exitLen": 18,
     "runSpeed": 8,
     "startGrace": 10,
-    "collapseTime": 85
+    "collapseTime": 95,
+    "paceMargin": 1.40,
+    "readTime": 5
   },
   "junctions": [
-    { "correct": "R", "len": 38, "hazards": [ { "type": "beam", "at": 0.45 }, { "type": "fire", "mode": "jump", "at": 0.72 } ] },
-    { "correct": "R", "len": 36, "hazards": [ { "type": "blade", "at": 0.4 }, { "type": "fire", "mode": "duck", "at": 0.68 } ] },
-    { "correct": "L", "len": 34, "hazards": [ { "type": "crack", "at": 0.5 } ] }
+    { "correct": "R", "len": 30, "hazards": [] },
+    { "correct": "L", "len": 28, "hazards": [] },
+    { "correct": "L", "len": 30, "hazards": [] },
+    { "correct": "R", "len": 26, "hazards": [] },
+    { "correct": "R", "len": 30, "hazards": [] },
+    { "correct": "L", "len": 28, "hazards": [] },
+    { "correct": "R", "len": 26, "hazards": [] }
   ]
 }

@@ -88,12 +88,12 @@ function drawExit(ctx, x, y) {
 // green "you started here" disc (matches the treasure-map START marker).
 function drawStart(ctx, x, y) {
   ctx.save();
-  ctx.shadowColor = 'rgba(120,235,120,0.9)'; ctx.shadowBlur = 8;
+  ctx.shadowColor = 'rgba(120,235,120,0.9)'; ctx.shadowBlur = 9;
   ctx.fillStyle = '#7ef07e';
-  ctx.beginPath(); ctx.arc(x, y, 5, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, 6, 0, 7); ctx.fill();
   ctx.shadowBlur = 0;
   ctx.fillStyle = '#122a0c';
-  ctx.beginPath(); ctx.arc(x, y, 2.3, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(x, y, 2.7, 0, 7); ctx.fill();
   ctx.restore();
 }
 
@@ -101,13 +101,21 @@ function drawArrow(ctx, x, y, heading) {
   const ang = Math.atan2(heading ? heading.z : 0, heading ? heading.x : 1);
   ctx.save();
   ctx.translate(x, y); ctx.rotate(ang);
-  // glowing gold disc + arrowhead pointing along travel
-  ctx.shadowColor = 'rgba(255,200,80,0.95)'; ctx.shadowBlur = 9;
+  // HEADING CONE — a soft light-wedge ahead of the marker so facing reads at a
+  // glance even at corner-HUD size (the tiny glyph alone didn't).
+  const cone = ctx.createLinearGradient(0, 0, 24, 0);
+  cone.addColorStop(0, 'rgba(255,212,90,0.55)'); cone.addColorStop(1, 'rgba(255,212,90,0)');
+  ctx.fillStyle = cone;
+  ctx.beginPath(); ctx.moveTo(3, 0); ctx.lineTo(24, -8.5); ctx.lineTo(24, 8.5); ctx.closePath(); ctx.fill();
+  // glowing gold disc (bigger + light ring) + arrowhead pointing along travel
+  ctx.shadowColor = 'rgba(255,200,80,0.95)'; ctx.shadowBlur = 10;
   ctx.fillStyle = '#1c1208';
-  ctx.beginPath(); ctx.arc(0, 0, 6.5, 0, 7); ctx.fill();
+  ctx.beginPath(); ctx.arc(0, 0, 8.5, 0, 7); ctx.fill();
   ctx.shadowBlur = 0;
+  ctx.strokeStyle = '#ffe6a4'; ctx.lineWidth = 1.4;
+  ctx.beginPath(); ctx.arc(0, 0, 8.5, 0, 7); ctx.stroke();
   ctx.fillStyle = '#ffd45a';
-  ctx.beginPath(); ctx.moveTo(6.5, 0); ctx.lineTo(-3.5, -4.2); ctx.lineTo(-1.2, 0); ctx.lineTo(-3.5, 4.2); ctx.closePath(); ctx.fill();
+  ctx.beginPath(); ctx.moveTo(8.2, 0); ctx.lineTo(-4.6, -5.4); ctx.lineTo(-1.6, 0); ctx.lineTo(-4.6, 5.4); ctx.closePath(); ctx.fill();
   ctx.restore();
 }
 
@@ -178,13 +186,141 @@ function drawCrack(ctx, x, y, r) {
 
 const HAZ_DRAW = { beam: drawBeam, blade: drawBlade, fire: drawFire, crack: drawCrack };
 
-export function drawMinimap(ctx, {
-  canvas, maze, bounds, waypoints, correctWaypoints, junctionStubs, mazeSegments, hazards, pos, heading,
-}) {
+// Draw the FULL grid labyrinth (every carved corridor + unmarked dead ends + loops)
+// as a treasure map: this is what makes the map READ as a maze, not a spine. The
+// route is NOT highlighted — the player traces it themselves. Start (green), exit
+// (gold arch) and the player arrow are placed by grid cell.
+// HEADING-UP variant: the whole maze is rotated about its CENTRE so the player's
+// travel direction points up. The rotation basis comes from the 3D camera's own
+// world axes (passed as camR/camF), so the map orientation can never disagree
+// with what the player sees ahead. Ported from the level1 prototype's drawMM.
+function drawGridMazeRot(ctx, MM, { grid, hazardCells, hitDeadEnds, player, camR, camF }) {
+  const { cols, rows, grid: cells, entrance, exit } = grid;
+  parchmentFill(ctx, MM);
+  const pad = 16;
+  // camera axes projected to the grid plane: world x -> +c, world z -> -r.
+  const Rc = camR.x, Rr = -camR.z, Fc = camF.x, Fr = -camF.z;
+  const rn = Math.hypot(Rc, Rr) || 1, fn = Math.hypot(Fc, Fr) || 1;
+  const gc = (cols - 1) / 2, gr = (rows - 1) / 2;
+  const span = Math.max(cols, rows);
+  const s = (MM - 2 * pad) / (span * 1.42);   // fit the WHOLE maze even spun to 45°
+  // grid cell (c,r) -> rotated screen point; forward -> up (the minus on y).
+  const M = (c, r) => {
+    const dc = c - gc, dr = r - gr;
+    return [MM / 2 + (dc * Rc + dr * Rr) / rn * s, MM / 2 - (dc * Fc + dr * Fr) / fn * s];
+  };
+  const CW = Math.max(4, s * 0.42);
+
+  // corridors: every open wall between adjacent cells, drawn as a rotated segment.
+  const segs = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const cel = cells[r][c];
+    if (!cel.E && c < cols - 1) segs.push([c, r, c + 1, r]);
+    if (!cel.S && r < rows - 1) segs.push([c, r, c, r + 1]);
+  }
+  const stroke = (w, col) => {
+    ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    segs.forEach(([c1, r1, c2, r2]) => { const a = M(c1, r1), b = M(c2, r2); ctx.moveTo(a[0], a[1]); ctx.lineTo(b[0], b[1]); });
+    ctx.stroke();
+  };
+  stroke(CW + 4, '#120c07');
+  stroke(CW, '#7e6038');
+  stroke(CW * 0.5, 'rgba(206,176,116,0.5)');
+  ctx.fillStyle = '#7e6038';
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { const p = M(c, r); ctx.beginPath(); ctx.arc(p[0], p[1], CW * 0.5, 0, 7); ctx.fill(); }
+
+  const xr = Math.max(3.2, s * 0.32);
+  if (hitDeadEnds && hitDeadEnds.length) hitDeadEnds.forEach((k) => { const c = k % cols, r = (k / cols) | 0; const p = M(c, r); drawDeadEnd(ctx, p[0], p[1], xr); });
+  if (hazardCells && hazardCells.length) {
+    const hr = Math.max(3.2, s * 0.4);
+    ['crack', 'beam', 'blade', 'fire'].forEach((kind) => { hazardCells.forEach((h) => { if (h.type === kind && HAZ_DRAW[kind]) { const p = M(h.c, h.r); HAZ_DRAW[kind](ctx, p[0], p[1], hr); } }); });
+  }
+  const pe = M(exit.c, exit.r), ps = M(entrance.c, entrance.r);
+  drawExit(ctx, pe[0], pe[1]);
+  drawStart(ctx, ps[0], ps[1]);
+  // player: live navigated position + heading, both rotated (heading resolves to up).
+  const pC = player.c + (player.dc || 0) * (player.t || 0);
+  const pR = player.r + (player.dr || 0) * (player.t || 0);
+  const pp = M(pC, pR);
+  const hx = player.dc || 0, hr2 = player.dr || 0;
+  const sx = (hx * Rc + hr2 * Rr) / rn, sy = -(hx * Fc + hr2 * Fr) / fn;
+  drawArrow(ctx, pp[0], pp[1], { x: sx, z: sy });
+}
+
+function drawGridMaze(ctx, MM, view) {
+  // HEADING-UP: when the camera axes are supplied, rotate the WHOLE map so travel
+  // is up (prototype parity). Otherwise fall back to the static north-up map.
+  if (view.camR && view.camF) { drawGridMazeRot(ctx, MM, view); return; }
+  const { grid, path, progress, hazardCells, hitDeadEnds, player } = view;
+  const { cols, rows, grid: cells, entrance, exit } = grid;
+  parchmentFill(ctx, MM);
+  const pad = 15;
+  const cw = (MM - 2 * pad) / cols, ch = (MM - 2 * pad) / rows;
+  const cx = (c) => pad + (c + 0.5) * cw;
+  const cy = (r) => pad + (r + 0.5) * ch;
+  const CW = Math.max(4.5, Math.min(cw, ch) * 0.4);
+
+  // North-up map (no heading rotation). PLAYER marker:
+  //   • grid engine passes `player` { r, c, t, dc, dr } — the LIVE navigated cell
+  //     (t = fraction toward the next cell, dc/dr = heading in grid space), so the
+  //     arrow follows the player anywhere in the labyrinth (wrong turns included);
+  //   • legacy engine passes `progress` — interpolated along the solution path.
+  let pC, pR, hd;
+  if (player) {
+    pC = player.c + (player.dc || 0) * (player.t || 0);
+    pR = player.r + (player.dr || 0) * (player.t || 0);
+    hd = { x: player.dc || 0, z: player.dr || 0 };
+  } else {
+    const n = path ? path.length : 1;
+    const fpos = Math.max(0, Math.min(n - 1, (progress || 0) * (n - 1)));
+    const pi = Math.floor(fpos), frac = fpos - pi;
+    const pc = (path && path[pi]) || entrance, pn = (path && path[Math.min(n - 1, pi + 1)]) || pc;
+    pC = pc.c + (pn.c - pc.c) * frac; pR = pc.r + (pn.r - pc.r) * frac;
+    hd = { x: pn.c - pc.c, z: pn.r - pc.r };
+  }
+
+  const segs = [];
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+    const cel = cells[r][c];
+    if (!cel.E && c < cols - 1) segs.push([cx(c), cy(r), cx(c + 1), cy(r)]);
+    if (!cel.S && r < rows - 1) segs.push([cx(c), cy(r), cx(c), cy(r + 1)]);
+  }
+  const stroke = (w, col, dy) => {
+    ctx.strokeStyle = col; ctx.lineWidth = w; ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    ctx.beginPath();
+    segs.forEach(([ax, ay, bx, by]) => { ctx.moveTo(ax, ay + (dy || 0)); ctx.lineTo(bx, by + (dy || 0)); });
+    ctx.stroke();
+  };
+  stroke(CW + 4, '#120c07', 0);
+  stroke(CW, '#7e6038', 0);
+  stroke(CW * 0.5, 'rgba(206,176,116,0.5)', -1.2);
+  ctx.fillStyle = '#7e6038';
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { ctx.beginPath(); ctx.arc(cx(c), cy(r), CW * 0.5, 0, 7); ctx.fill(); }
+  // discovered dead ends only (a red-X appears once you've run into that cell)
+  const xr = Math.max(3.6, Math.min(cw, ch) * 0.17);
+  if (hitDeadEnds && hitDeadEnds.length) hitDeadEnds.forEach((k) => { const c = k % cols, r = (k / cols) | 0; drawDeadEnd(ctx, cx(c), cy(r), xr); });
+  if (hazardCells && hazardCells.length) {
+    const hr = Math.max(3.6, Math.min(cw, ch) * 0.19);
+    ['crack', 'beam', 'blade', 'fire'].forEach((kind) => { hazardCells.forEach((h) => { if (h.type === kind && HAZ_DRAW[kind]) HAZ_DRAW[kind](ctx, cx(h.c), cy(h.r), hr); }); });
+  }
+  drawExit(ctx, cx(exit.c), cy(exit.r));
+  drawStart(ctx, cx(entrance.c), cy(entrance.r));
+  drawArrow(ctx, cx(pC), cy(pR), hd);
+}
+
+export function drawMinimap(ctx, opts) {
   if (!ctx) return;
-  const { minx, maxx, minz, maxz } = bounds;
-  const MM = canvas.width;
+  const { canvas, maze, bounds, waypoints, correctWaypoints, junctionStubs, mazeSegments, hazards, pos, heading, gridView } = opts;
+  // CRISP AT ANY SIZE: all layout below is in 190 LOGICAL units; the canvas backing
+  // store can be larger (e.g. 380 for the study panel) and we scale the transform —
+  // vectors rasterize at full backing resolution, so no blurry 190px upscale.
+  const MM = 190;
+  const S = (canvas.width || MM) / MM;
+  ctx.setTransform(S, 0, 0, S, 0, 0);
   ctx.clearRect(0, 0, MM, MM);
+  if (gridView && gridView.grid) { drawGridMaze(ctx, MM, gridView); return; }
+  const { minx, maxx, minz, maxz } = bounds;
   parchmentFill(ctx, MM);
   const pad = 18, sc = Math.min((MM - 2 * pad) / ((maxx - minx) || 1), (MM - 2 * pad) / ((maxz - minz) || 1));
   const tx = (x) => pad + (x - minx) * sc, tz = (z) => pad + (z - minz) * sc;
@@ -206,13 +342,10 @@ export function drawMinimap(ctx, {
   // 2) mortar seams (tiled-block read).
   tileSeams(ctx, segs, tx, tz, CW * 1.05);
 
-  // 3) DEAD ENDS: a red X capping each dim dead-end stub (the wrong turns).
+  // 3) DEAD ENDS are drawn as ordinary corridors (above) — NOT marked. The maze
+  //    reads as one interconnected labyrinth and the player must trace the route
+  //    themselves; wrong turns are discovered, not flagged.
   const iconR = Math.max(3.2, MM * 0.03);
-  if (junctionStubs && junctionStubs.length) {
-    junctionStubs.forEach((st) => {
-      if (st && st.length) { const e = st[st.length - 1]; drawDeadEnd(ctx, tx(e.x), tz(e.z), iconR); }
-    });
-  }
 
   // 4) TRAP ICONS: drop a legend icon on every placed hazard along the route
   //    (crack first, then beam/blade/fire so the brighter icons sit on top).

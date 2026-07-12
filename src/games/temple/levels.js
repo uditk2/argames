@@ -16,9 +16,12 @@
 // ===========================================================================
 import { assetUrl } from './assetUrl.js';
 export const LEVELS = [
-  { name: 'The Long Hall', map: assetUrl('assets/temple/level1.json') },   // gentle linear intro
-  { name: 'Bladeworks',    map: assetUrl('assets/temple/level2.json') },   // first maze (mode:"maze")
-  { name: 'The Labyrinth', map: assetUrl('assets/temple/level3_maze.json') }, // hard maze (mode:"maze")
+  { name: 'The Winding Halls', map: assetUrl('assets/temple/level1.json') },     // no hazards — a calm multi-junction maze to learn map-reading
+  { name: 'Whispering Blades', map: assetUrl('assets/temple/level2.json') },     // blades + fallen beams
+  { name: 'The Sunken Deep',  map: assetUrl('assets/temple/level3_maze.json') }, // + cracked floor
+  { name: "The Lion's Maw",   map: assetUrl('assets/temple/level4_maze.json') }, // + fire-spitting lion
+  { name: 'The Sunstone',     map: assetUrl('assets/temple/level5_maze.json') }, // take the artifact
+  { name: 'Into Daylight',    map: assetUrl('assets/temple/level6_maze.json') }, // escape the temple
 ];
 
 export default LEVELS;
