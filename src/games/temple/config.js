@@ -92,6 +92,16 @@ export const GRID = {
 // A/B comparison. The engine reads this default and the query param together.
 export const CORRIDOR_SURFACE = 'tip';
 
+// ---- AVATAR IDENTITY -------------------------------------------------------
+// The playable relic hunter's name + one-line identity, kept here as the SINGLE
+// source so copy (wizard, store listing, share card) reads from one place and the
+// character can be renamed with a one-line change. Original character (no IP tie).
+export const AVATAR_IDENTITY = {
+  name: 'Mira',
+  title: 'relic hunter',
+  tagline: 'Mira, relic hunter',
+};
+
 // Default map params — only used if a field is missing from the loaded JSON.
 export const MAP_DEFAULTS = {
   hallWidth: 12,

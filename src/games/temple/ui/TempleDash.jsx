@@ -24,7 +24,7 @@
 // entirely here — the engine never sees it (it only reports phase/state).
 // ===========================================================================
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { ASSETS, RUN_TO_MOVE } from '../config.js';
+import { ASSETS, RUN_TO_MOVE, AVATAR_IDENTITY } from '../config.js';
 import { assetUrl } from '../assetUrl.js';
 // GRID ENGINE (default): the 3D world, the navigation and the minimap are all
 // built from the SAME grid labyrinth, so every corridor the map shows is
@@ -687,7 +687,8 @@ export default function TempleDash({ onExit }) {
                   <img src={assetUrl('assets/temple/stone_door.webp')} alt="" width={168} height={168} draggable={false}
                     className="mx-auto mb-4 select-none" style={{ objectFit: 'contain', filter: 'drop-shadow(0 4px 16px rgba(0,0,0,0.55))' }} />
                   <div className="text-[10px] font-black uppercase tracking-[0.22em] mb-1" style={{ color: '#ffb454' }}>The heist</div>
-                  <div className="font-display font-black text-[20px] mb-2" style={{ color: '#ffe9c8' }}>Take the Syamantaka</div>
+                  <div className="font-display font-black text-[20px] mb-1" style={{ color: '#ffe9c8' }}>Take the Syamantaka</div>
+                  <div className="text-[11px] font-semibold mb-2" style={{ color: '#ffb454' }}>Play as {AVATAR_IDENTITY.tagline}</div>
                   <p className="text-[13px] leading-snug px-2" style={{ color: '#ffd99a' }}>{narrative.PREMISE.en}</p>
                 </div>
               )}
