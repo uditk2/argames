@@ -576,9 +576,14 @@ export default function TempleDash({ onExit }) {
                   header and the GO block: always large, always centered, can't overlap
                   either, and fills what used to be an empty void. Sized against BOTH
                   axes so short viewports shrink it instead of colliding. */}
-              <div className="flex-1 min-h-0 w-full flex items-center justify-center py-2">
-                <div className="relative" style={{ width: 'min(52vh, 400px, 92vw)', aspectRatio: '1 / 1' }}>
+              <div className="flex-1 min-h-0 w-full flex flex-col items-center justify-center py-2 gap-1.5">
+                <div className="relative" style={{ width: 'min(50vh, 400px, 92vw)', aspectRatio: '1 / 1' }}>
                   <FramedMap attachMM={attachMM} />
+                </div>
+                {/* the study map is framed as a recovered palm-leaf fragment (folklore
+                    8c): the temple's own record, assembling one piece per trial. */}
+                <div className="text-[10px] uppercase tracking-[0.16em] font-semibold" style={{ color: '#c9a878' }}>
+                  🗺 Palm-leaf fragment · {levelIndex + 1} of 6 recovered
                 </div>
               </div>
               <div className="text-center px-6 pb-2">

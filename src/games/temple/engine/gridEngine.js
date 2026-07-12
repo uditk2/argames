@@ -195,6 +195,14 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     THREE, scene, W: CELL, H, addLight,
     pos: { x: exitWorld.x, z: exitWorld.z }, dirVec: approach,
   }) : null;
+  // L5 CHAMBER SEAL: a stone slab that stays fully open until you take the gem,
+  // then SLAMS the relic chamber shut behind you (boom + shake), same climax beat
+  // as the L1–L4 exit walls. It never gates the win — it only seals on grab.
+  const sealWall = ENDING === 'artifact' ? createStoneDoor({
+    THREE, scene, W: CELL, H,
+    pos: { x: exitWorld.x + approach.x * 2.0, z: exitWorld.z + approach.z * 2.0 },
+    dirVec: approach,
+  }) : null;
   // CARRIED GLOW (L6): if the relic was taken on L5 this run, the runner carries
   // a warm gold glow — the "you're holding the thing you came for" payoff. The
   // flag is set on grab (below) and persists for the L6 leg via sessionStorage.
@@ -254,6 +262,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     nav.reset(); collapse.reset(); hazards.reset(); fx.reset(); avatar.reset();
     world.retarget(nav.cell.r, nav.cell.c, nav.heading, true);   // re-anchor the entry projection
     if (door) door.reset();
+    if (sealWall) sealWall.reset();
     if (relic) { relic.reset(); setRelicTaken(false); }   // retrying L5 un-takes the gem
     hitDeadEnds.clear();
     phase = 'run'; collapseArmed = false; runT = 0; runDist = 0; clears = 0;
@@ -307,9 +316,10 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     // L5: physically take the gem — fires the 0.6s slow-mo reach + light burst,
     // and flags the run so L6 shows the carried glow.
     if (relic) { relic.grab(); setRelicTaken(true); }
-    // L1–L4: SLAM the wall shut behind you — the "no going back" climax. The boom
-    // + camera-shake pulse fire on impact (in the loop), synced to the visual.
+    // L1–L4 exit wall, or L5 chamber wall: SLAM it shut behind you — the "no going
+    // back" climax. The boom + camera-shake pulse fire on impact (in the loop).
     if (door) door.seal();
+    if (sealWall) sealWall.seal();
     cue(text || WIN_CUE, '#ffe08a'); pushState();
   }
 
@@ -439,6 +449,8 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
       // slam behind you on a clear: advance the drop; on impact fire boom + shake.
       if (door.sealing && door.tickSeal(dt)) { sealShake = 1; audio.seal(); }
     }
+    // L5 chamber wall seals after the grab (same impact beat).
+    if (sealWall && sealWall.sealing && sealWall.tickSeal(dt)) { sealShake = 1; audio.seal(); }
     audio.danger(Math.max(0, Math.min(1, 1 - collapse.remaining() / Math.max(1, BUDGET_S))));
 
     // ---- movement / hazards / exit ----------------------------------------------
