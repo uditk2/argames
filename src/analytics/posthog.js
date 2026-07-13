@@ -23,6 +23,8 @@
 // just logs to the console in dev and returns, so the game is never affected.
 // ===========================================================================
 
+import { isLocalHost } from './host.js';
+
 function env(name) {
   try { return (import.meta && import.meta.env && import.meta.env[name]) || ''; } catch { return ''; }
 }
@@ -59,6 +61,7 @@ function flushQueue() {
 /** Initialize PostHog once. No-op (with a dev hint) when no key is configured. */
 export function initPostHog() {
   if (initStarted || typeof window === 'undefined') return;
+  if (isLocalHost()) { console.info('[PostHog] localhost/dev — analytics disabled.'); return; }
   if (!KEY) {
     console.info('[PostHog] VITE_POSTHOG_KEY not set — analytics disabled (no-op).');
     return;

@@ -4,6 +4,8 @@
 // No-ops cleanly if the ID is still the placeholder or gtag fails to load.
 // ===========================================================================
 
+import { isLocalHost } from './host.js';
+
 const MEASUREMENT_ID = 'G-B8H0EYCQ6Y'; // GA4 Measurement ID
 
 let initialized = false;
@@ -15,6 +17,7 @@ function isPlaceholder() {
 /** Inject the GA script + bootstrap gtag (idempotent). */
 export function initGA() {
   if (initialized || isPlaceholder() || typeof document === 'undefined') return;
+  if (isLocalHost()) { console.info('[GA] localhost/dev — analytics disabled.'); return; }
   initialized = true;
   const s = document.createElement('script');
   s.async = true;
@@ -28,6 +31,7 @@ export function initGA() {
 
 /** Track an event. Safe to call even before initGA / with placeholder ID. */
 export function track(event, params = {}) {
+  if (isLocalHost()) return;   // never ingest local-dev traffic
   if (isPlaceholder()) {
     // Helpful during development so events are still visible.
     console.debug('[GA stub]', event, params);

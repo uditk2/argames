@@ -13,8 +13,10 @@
 // ===========================================================================
 import { track as gaTrack } from './ga.js';
 import { phCapture } from './posthog.js';
+import { isLocalHost } from './host.js';
 
 export function event(name, props = {}) {
+  if (isLocalHost()) return;   // never ingest our own local-dev traffic
   try { gaTrack(name, props); } catch {}
   try { phCapture(name, props); } catch {}
 }
