@@ -25,6 +25,8 @@ export function createAvatarActor({ THREE, scene, ALIGN = { avatarScale: 1, avat
   const DUCK_DROP = (CHAR && CHAR.duckDrop != null) ? CHAR.duckDrop : AVATAR.duckDrop;
   const sprite = makeSpriteSheets(THREE, CHAR && CHAR.sprites);
   const mat = new THREE.MeshBasicMaterial({ transparent: true, side: THREE.DoubleSide, depthWrite: false });
+  // warm torch tint so the unlit sprite reads as lit by the temple (per-character).
+  if (CHAR && CHAR.tint != null) mat.color.setHex(CHAR.tint);
   const geo = new THREE.PlaneGeometry(AVATAR.height * AVATAR.aspect, AVATAR.height);
   const mesh = new THREE.Mesh(geo, mat);
   mesh.renderOrder = 5;

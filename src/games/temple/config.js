@@ -178,6 +178,9 @@ export const CHARACTERS = {
     },
     // sprite already rises/crouches, so keep the engine lift small (just a touch of pop).
     jumpLift: 1.1, duckDrop: 0.5,
+    // Warm torch tint (multiplied onto the unlit sprite) so she reads as lit by the
+    // temple's torchlight instead of flat/cool — matched to the corridor palette.
+    tint: 0xd9b385,
   },
   // Legacy sheet kept available (?character=classic) but no longer the default —
   // it reads as Nathan Drake (IP risk), which the new hunters exist to replace.
@@ -189,6 +192,7 @@ export const CHARACTERS = {
       duck: { dir: assetUrl('assets/temple/char/duck'), count: 24 },
     },
     jumpLift: 3.1, duckDrop: 1.7,
+    tint: 0xffffff,   // legacy sheet is already warm-toned — no tint
   },
 };
 export const DEFAULT_CHARACTER = 'mira';
