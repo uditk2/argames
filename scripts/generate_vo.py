@@ -60,35 +60,45 @@ def sh(cmd):
     return subprocess.check_output(cmd, shell=True, text=True).strip()
 
 
+API_KEY = os.environ.get('TTS_API_KEY', '').strip()   # simplest auth — bypasses ADC/quota-project IAM
+
+
 def synth(text, lang_code, voice_name, token, project):
     body = json.dumps({
         'input': {'text': text},
         'voice': {'languageCode': lang_code, 'name': voice_name},
         'audioConfig': {'audioEncoding': 'MP3', 'speakingRate': 0.94, 'pitch': -2.0},
     }).encode('utf-8')
-    headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json; charset=utf-8'}
-    # User ADC tokens need a QUOTA PROJECT for the API — pass it explicitly so we
-    # don't depend on `gcloud auth application-default set-quota-project`.
-    if project:
-        headers['x-goog-user-project'] = project
-    req = urllib.request.Request('https://texttospeech.googleapis.com/v1/text:synthesize', data=body, headers=headers)
+    url = 'https://texttospeech.googleapis.com/v1/text:synthesize'
+    headers = {'Content-Type': 'application/json; charset=utf-8'}
+    if API_KEY:
+        # API-key auth: no bearer token, no quota project, no serviceusage role needed.
+        url += f'?key={API_KEY}'
+    else:
+        headers['Authorization'] = f'Bearer {token}'
+        if project:
+            headers['x-goog-user-project'] = project   # required for user ADC tokens
+    req = urllib.request.Request(url, data=body, headers=headers)
     with urllib.request.urlopen(req) as r:
         return base64.b64decode(json.loads(r.read())['audioContent'])
 
 
 def main():
-    try:
-        token = sh('gcloud auth print-access-token')
-    except Exception:
-        sys.exit('ERROR: `gcloud auth print-access-token` failed — run `gcloud auth login` first.')
-    # Quota project for the API: env override, else the active gcloud project.
-    project = os.environ.get('GCP_PROJECT') or os.environ.get('GOOGLE_CLOUD_PROJECT') or ''
-    if not project:
-        try: project = sh('gcloud config get-value project 2>/dev/null')
-        except Exception: project = ''
-    if project in ('', '(unset)'):
-        sys.exit('ERROR: no project set. Run `gcloud config set project seerly` (or set GCP_PROJECT).')
-    print(f'Using quota project: {project}')
+    token, project = '', ''
+    if API_KEY:
+        print('Using API key auth (TTS_API_KEY).')
+    else:
+        try:
+            token = sh('gcloud auth print-access-token')
+        except Exception:
+            sys.exit('ERROR: `gcloud auth print-access-token` failed — run `gcloud auth login`, or set TTS_API_KEY.')
+        project = os.environ.get('GCP_PROJECT') or os.environ.get('GOOGLE_CLOUD_PROJECT') or ''
+        if not project:
+            try: project = sh('gcloud config get-value project 2>/dev/null')
+            except Exception: project = ''
+        if project in ('', '(unset)'):
+            sys.exit('ERROR: no project set. Run `gcloud config set project seerly` (or set GCP_PROJECT).')
+        print(f'Using ADC token · quota project: {project}')
     voices = {'en': (VOICE_EN, 'en-IN'), 'hi': (VOICE_HI, 'hi-IN')}
     for lang, (voice, code) in voices.items():
         d = os.path.join(OUT_DIR, lang)
@@ -104,8 +114,9 @@ def main():
                 print(f'  FAIL {lang}/{key}: HTTP {e.code} {e.read().decode("utf-8", "ignore")[:200]}')
             except Exception as e:
                 print(f'  FAIL {lang}/{key}: {e}')
-    print('\nDone. MP3s are in public/assets/temple/vo/. If a voice name errored, try the'
-          '\nWavenet fallback:  VOICE_EN=en-IN-Wavenet-B VOICE_HI=hi-IN-Wavenet-B python3 scripts/generate_vo.py')
+    print('\nDone. MP3s are in public/assets/temple/vo/.'
+          '\n  • Voice name errored?  add  VOICE_EN=en-IN-Wavenet-B VOICE_HI=hi-IN-Wavenet-B'
+          '\n  • Permission/quota 403? use an API key:  TTS_API_KEY=<key> python3 scripts/generate_vo.py')
 
 
 if __name__ == '__main__':
