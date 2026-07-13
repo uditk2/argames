@@ -681,87 +681,55 @@ export default function TempleDash({ onExit }) {
         </>
       )}
 
-      {/* INTRO */}
+      {/* INTRO — a SINGLE animated + narrated screen that reaches gameplay in ONE
+          click (CrazyGames requires ≤1 click to play). No multi-step wizard: the
+          chosen hunter runs down the corridor, one narrated temple line sets the
+          hook, and PLAY drops straight into L1's study screen (which is gameplay).
+          Controls are taught just-in-time in-run. */}
       {screen === 'intro' && (
         <div className="absolute inset-0 z-[20] flex items-center justify-center p-4">
-          {/* key-art backdrop so the wizard isn't floating on a black void */}
           <div className="absolute inset-0" aria-hidden="true"
             style={{ backgroundImage: `url(${assetUrl('assets/temple/corridor_dark.webp')})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'brightness(0.34) saturate(0.95)' }} />
           <div className="absolute inset-0" aria-hidden="true"
             style={{ background: 'radial-gradient(circle at 50% 38%, rgba(30,19,9,0.25), rgba(6,4,2,0.9))' }} />
-          <div className="panel w-[min(94vw,460px)] text-center overflow-hidden relative z-[1]" style={{ padding: 0 }}>
-            {/* HEADER — title + step dots + skip */}
+          <div className="panel w-[min(94vw,440px)] text-center overflow-hidden relative z-[1]" style={{ padding: 0 }}>
             <div className="pt-5 px-6">
-              <div className="font-display font-black text-[26px] leading-none bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">TEMPLE COLLAPSE</div>
-              <div className="flex items-center justify-center gap-1.5 mt-3">
-                {Array.from({ length: WIZ_STEPS }).map((_, i) => (
-                  <div key={i} style={{ width: i === wizStep ? 20 : 7, height: 7, borderRadius: 7, background: i <= wizStep ? '#ffd45a' : '#ffffff2a', transition: 'all 220ms' }} />
-                ))}
-              </div>
-              {wizStep < WIZ_STEPS - 1 && (
-                <button onClick={() => startCampaign(0)} className="absolute top-4 right-4 text-[11px] font-semibold uppercase tracking-[0.12em]" style={{ color: '#ffb45499' }}>Skip ›</button>
-              )}
+              <div className="font-display font-black text-[26px] leading-none bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">RELIC HUNTER</div>
+              <div className="text-[10px] font-semibold uppercase tracking-[0.2em] mt-1.5" style={{ color: '#ffb454' }}>Temple Collapse</div>
             </div>
 
-            {/* STEP BODY — one focused, illustrated step at a time */}
-            <div className="px-6 py-5 flex flex-col justify-center" style={{ minHeight: 320 }}>
-              {/* STEP 0 — the mystical premise (one narrated line; the temple's voice). */}
-              {wizStep === 0 && (
-                <div>
-                  <img src={assetUrl('assets/temple/stone_door.webp')} alt="" width={150} height={150} draggable={false}
-                    className="mx-auto mb-4 select-none" style={{ objectFit: 'contain', filter: 'drop-shadow(0 4px 18px rgba(0,0,0,0.6))' }} />
-                  <div className="text-[10px] font-black uppercase tracking-[0.26em] mb-1" style={{ color: '#ffb454' }}>A thousand years, sealed</div>
-                  <div className="font-display font-black text-[22px] mb-1" style={{ color: '#ffe9c8' }}>The Syamantaka</div>
-                  <p className="text-[13.5px] italic leading-snug px-3" style={{ color: '#e8c79a' }}>
-                    “Surya's gem has kept this temple standing. You've come to take it anyway.”
-                  </p>
-                  <CharacterPicker selected={character} onPick={pickCharacter} />
-                  <VOButton k="premise" />
-                </div>
-              )}
-              {/* STEP 1 — the goal + the six-trial journey; controls are learned in-run. */}
-              {wizStep === 1 && (
-                <div>
-                  <div className="mb-3"><LevelJourney current={0} starsByLevel={starsByLevel} /></div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.26em] mb-1" style={{ color: '#ffb454' }}>Six trials · one way out</div>
-                  <div className="font-display font-black text-[21px] mb-2" style={{ color: '#ffe9c8' }}>Read the map. Reach the light.</div>
-                  <p className="text-[13.5px] leading-snug px-3" style={{ color: '#ffd99a' }}>
-                    Study the route, then run — before the temple comes down. Some paths lead nowhere.
-                  </p>
-                  <VOButton k="goal" />
-                  {(summary.relics > 0 || summary.totalStars > 0 || summary.runs > 0) && (
-                    <div className="mt-3 text-[11px] font-semibold tracking-[0.06em]" style={{ color: '#ffd45a' }}>
-                      ★ {summary.totalStars}/{summary.maxStars} · {summary.relics} {summary.relics === 1 ? 'relic' : 'relics'} recovered · {summary.runs} {summary.runs === 1 ? 'run' : 'runs'}
-                    </div>
-                  )}
-                </div>
-              )}
+            {/* ANIMATED HERO — the chosen hunter running the torch-lit corridor. */}
+            <div className="relative mx-auto mt-3" style={{ height: 176, overflow: 'hidden' }}>
+              <div className="absolute inset-0" aria-hidden="true"
+                style={{ backgroundImage: `url(${assetUrl('assets/temple/corridor_bright.webp')})`, backgroundSize: 'cover', backgroundPosition: 'center 30%', filter: 'brightness(0.72)' }} />
+              <div className="absolute inset-0" aria-hidden="true"
+                style={{ background: 'linear-gradient(180deg, rgba(20,12,6,0.5) 0%, rgba(20,12,6,0) 25%, rgba(20,12,6,0.65) 100%)' }} />
+              <SpriteRunner character={character} />
             </div>
 
-            {/* NAV — Back / Next, or Play on the last step */}
-            <div className="px-6 pb-5 flex items-center gap-2">
-              {wizStep > 0 ? (
-                <button onClick={() => setWizStep(wizStep - 1)}
-                  className="px-4 py-3 rounded-xl font-semibold text-ink/80 bg-realm/50 border border-magic/30 hover:border-magic/60 transition">Back</button>
-              ) : onExit ? (
-                <button onClick={onExit}
-                  className="px-4 py-3 rounded-xl font-semibold text-ink/80 bg-realm/50 border border-magic/30 hover:border-magic/60 transition">Exit</button>
-              ) : <div className="w-[64px]" />}
-              {wizStep < WIZ_STEPS - 1 ? (
-                <button onClick={() => setWizStep(wizStep + 1)}
-                  className="flex-1 py-3 rounded-xl font-black text-white text-lg bg-gradient-to-r from-fire to-magic shadow-glow-fire hover:brightness-110 transition">Next ›</button>
-              ) : (
-                <div className="flex-1 flex flex-col gap-2">
-                  <button onClick={() => startCampaign(0)}
-                    className="w-full py-3 rounded-xl font-black text-white text-lg bg-gradient-to-r from-fire to-magic shadow-glow-fire hover:brightness-110 transition">▶ {summary.furthest > 0 ? 'New run' : 'Play'}</button>
-                  {summary.furthest > 1 && summary.furthest < 6 && (
-                    <button onClick={() => startCampaign(Math.min(summary.furthest, LEVELS.length - 1))}
-                      className="w-full py-2.5 rounded-xl font-bold text-[#ffe9c8] transition hover:brightness-110"
-                      style={{ background: 'rgba(28,19,11,0.7)', border: '1px solid #ffb45455' }}>
-                      Resume · Level {Math.min(summary.furthest + 1, 6)}
-                    </button>
-                  )}
-                </div>
+            <div className="px-6 pt-3">
+              <p className="text-[13.5px] italic leading-snug" style={{ color: '#e8c79a' }}>
+                “Surya's gem has kept this temple standing. You've come to take it anyway.”
+              </p>
+              <VOButton k="premise" />
+              <CharacterPicker selected={character} onPick={pickCharacter} />
+            </div>
+
+            {/* PLAY — one click to gameplay. */}
+            <div className="px-6 py-5 flex flex-col gap-2">
+              <button onClick={() => startCampaign(0)}
+                className="w-full py-3.5 rounded-xl font-black text-white text-lg bg-gradient-to-r from-fire to-magic shadow-glow-fire hover:brightness-110 transition">
+                ▶ {summary.furthest > 0 ? 'New run' : 'Play'}
+              </button>
+              {summary.furthest > 1 && summary.furthest < 6 && (
+                <button onClick={() => startCampaign(Math.min(summary.furthest, LEVELS.length - 1))}
+                  className="w-full py-2.5 rounded-xl font-bold text-[#ffe9c8] transition hover:brightness-110"
+                  style={{ background: 'rgba(28,19,11,0.7)', border: '1px solid #ffb45455' }}>
+                  Resume · Level {Math.min(summary.furthest + 1, 6)}
+                </button>
+              )}
+              {onExit && (
+                <button onClick={onExit} className="text-[11px] font-semibold uppercase tracking-[0.12em] mt-0.5" style={{ color: '#ffb45499' }}>Exit</button>
               )}
             </div>
           </div>
@@ -995,6 +963,26 @@ function VictoryPanel({ distance, clears, lives, summary, onRestart, onExit }) {
         <BackBtn onExit={onExit} />
       </div>
     </Overlay>
+  );
+}
+
+// SPRITE RUNNER — the intro's animated hero: cycles the chosen hunter's run
+// frames over the corridor art. Pure decoration (a few KB of webp), so it gives
+// the screen motion without a heavy opening video.
+function SpriteRunner({ character }) {
+  const cfg = CHARACTERS[character] || CHARACTERS.mira;
+  const count = (cfg.sprites && cfg.sprites.run.count) || 1;
+  const [i, setI] = useState(0);
+  useEffect(() => {
+    setI(0);
+    const id = setInterval(() => setI((v) => (v + 1) % count), 1000 / 12);
+    return () => clearInterval(id);
+  }, [character, count]);
+  const n = String(i).padStart(2, '0');
+  return (
+    <img src={assetUrl(`assets/temple/char/${character}/run/r_${n}.webp`)} alt="" aria-hidden="true" draggable={false}
+      className="absolute left-1/2 -translate-x-1/2 select-none"
+      style={{ height: 150, width: 'auto', bottom: 8, objectFit: 'contain', filter: 'brightness(0.9) saturate(0.9)' }} />
   );
 }
 
