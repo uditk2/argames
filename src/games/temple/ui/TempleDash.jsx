@@ -57,7 +57,26 @@ const NO_AUTOPAUSE = (() => {
   try { return new URLSearchParams(window.location.search).has('nopause'); } catch { return false; }
 })();
 const START_LIVES = 3;
-const WIZ_STEPS = 4;   // onboarding wizard: Heist → Read the map → Controls → Journey/Play
+
+// ---- VOICE NARRATION (temple-voice TTS) ------------------------------------
+// Plays a short narration clip for a beat if its audio file exists under
+// assets/temple/vo/<lang>/<key>.mp3 (generated via Google Cloud TTS — see
+// narrative.js for the bilingual script). Gracefully no-ops when the file isn't
+// present yet or autoplay is blocked, so the game is fully playable without VO.
+const VO_LANG = (() => { try { return (navigator.language || 'en').toLowerCase().startsWith('hi') ? 'hi' : 'en'; } catch { return 'en'; } })();
+let _voAudio = null;
+function playVO(key) {
+  try {
+    if (_voAudio) { try { _voAudio.pause(); } catch { /* ignore */ } _voAudio = null; }
+    const a = new Audio(assetUrl(`assets/temple/vo/${VO_LANG}/${key}.mp3`));
+    a.volume = 0.9; _voAudio = a;
+    a.play().catch(() => { /* no file yet / autoplay blocked — silent */ });
+  } catch { /* no VO */ }
+}
+const WIZ_STEPS = 2;   // slim, atmospheric onboarding: (0) mystical premise → (1) the goal + Play.
+                       // Controls are taught JUST-IN-TIME in-run (L1 = turns only; jump/duck
+                       // introduced in the levels where beams/blades first appear), which keeps
+                       // the intro short — a long tutorial is a portal-submission rejection risk.
 
 export default function TempleDash({ onExit }) {
   const canvasRef = useRef(null), fxRef = useRef(null), mmRef = useRef(null);
@@ -682,44 +701,30 @@ export default function TempleDash({ onExit }) {
 
             {/* STEP BODY — one focused, illustrated step at a time */}
             <div className="px-6 py-5 flex flex-col justify-center" style={{ minHeight: 320 }}>
+              {/* STEP 0 — the mystical premise (one narrated line; the temple's voice). */}
               {wizStep === 0 && (
                 <div>
-                  <img src={assetUrl('assets/temple/stone_door.webp')} alt="" width={168} height={168} draggable={false}
-                    className="mx-auto mb-4 select-none" style={{ objectFit: 'contain', filter: 'drop-shadow(0 4px 16px rgba(0,0,0,0.55))' }} />
-                  <div className="text-[10px] font-black uppercase tracking-[0.22em] mb-1" style={{ color: '#ffb454' }}>The heist</div>
-                  <div className="font-display font-black text-[20px] mb-1" style={{ color: '#ffe9c8' }}>Take the Syamantaka</div>
-                  <div className="text-[11px] font-semibold mb-2" style={{ color: '#ffb454' }}>Play as {AVATAR_IDENTITY.tagline}</div>
-                  <p className="text-[13px] leading-snug px-2" style={{ color: '#ffd99a' }}>{narrative.PREMISE.en}</p>
+                  <img src={assetUrl('assets/temple/stone_door.webp')} alt="" width={150} height={150} draggable={false}
+                    className="mx-auto mb-4 select-none" style={{ objectFit: 'contain', filter: 'drop-shadow(0 4px 18px rgba(0,0,0,0.6))' }} />
+                  <div className="text-[10px] font-black uppercase tracking-[0.26em] mb-1" style={{ color: '#ffb454' }}>A thousand years, sealed</div>
+                  <div className="font-display font-black text-[22px] mb-1" style={{ color: '#ffe9c8' }}>The Syamantaka</div>
+                  <p className="text-[13.5px] italic leading-snug px-3" style={{ color: '#e8c79a' }}>
+                    “Surya's gem has kept this temple standing. You've come to take it anyway.”
+                  </p>
+                  <div className="mt-2 text-[11px] font-semibold" style={{ color: '#ffb454' }}>You are {AVATAR_IDENTITY.tagline}</div>
+                  <VOButton k="premise" />
                 </div>
               )}
+              {/* STEP 1 — the goal + the six-trial journey; controls are learned in-run. */}
               {wizStep === 1 && (
                 <div>
-                  <div className="mb-3"><IntroMap /></div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.22em] mb-1" style={{ color: '#ffb454' }}>The goal</div>
-                  <div className="font-display font-black text-[20px] mb-2" style={{ color: '#ffe9c8' }}>Read the map, find the way out</div>
-                  <p className="text-[13px] leading-snug px-2" style={{ color: '#ffd99a' }}>Escape before it collapses. Study the maze and plan your turns to the <span style={{ color: '#ffe6a4' }}>exit</span>. Some paths lead nowhere — and the clock is ticking.</p>
-                </div>
-              )}
-              {wizStep === 2 && (
-                <div>
-                  <div className="grid grid-cols-3 gap-2.5 mb-4">
-                    {IS_PHONE ? (
-                      <><GestureCard glyph="↑" label="JUMP" /><GestureCard glyph="↓" label="DUCK" /><GestureCard glyph="← →" label="TURN" /></>
-                    ) : (
-                      <><ControlCard caps={['↑', 'W']} label="JUMP" sub="beams · fire" /><ControlCard caps={['↓', 'S']} label="DUCK" sub="blades" /><ControlCard caps={['← →', 'A D']} label="TURN" sub="junctions" /></>
-                    )}
-                  </div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.22em] mb-1" style={{ color: '#ffb454' }}>Controls</div>
-                  <div className="font-display font-black text-[20px] mb-2" style={{ color: '#ffe9c8' }}>You run on your own</div>
-                  <p className="text-[13px] leading-snug px-2" style={{ color: '#ffd99a' }}>Jump the beams and fire, duck the blades, turn at junctions. {IS_PHONE ? 'Tap ↩ to turn around; tap the 🗺 MAP button' : 'Press Q to turn around; hold M'} to bring the map up mid-run.</p>
-                </div>
-              )}
-              {wizStep === 3 && (
-                <div>
-                  <div className="mb-4"><LevelJourney current={0} starsByLevel={starsByLevel} /></div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.22em] mb-1" style={{ color: '#ffb454' }}>The journey</div>
-                  <div className="font-display font-black text-[20px] mb-2" style={{ color: '#ffe9c8' }}>Six trials, one way out</div>
-                  <p className="text-[13px] leading-snug px-2" style={{ color: '#ffd99a' }}>Grab the Syamantaka on the fifth trial and burst into daylight on the sixth. 6 levels · 3 shared lives.</p>
+                  <div className="mb-3"><LevelJourney current={0} starsByLevel={starsByLevel} /></div>
+                  <div className="text-[10px] font-black uppercase tracking-[0.26em] mb-1" style={{ color: '#ffb454' }}>Six trials · one way out</div>
+                  <div className="font-display font-black text-[21px] mb-2" style={{ color: '#ffe9c8' }}>Read the map. Reach the light.</div>
+                  <p className="text-[13.5px] leading-snug px-3" style={{ color: '#ffd99a' }}>
+                    Study the route, then run — before the temple comes down. Some paths lead nowhere.
+                  </p>
+                  <VOButton k="goal" />
                   {(summary.relics > 0 || summary.totalStars > 0 || summary.runs > 0) && (
                     <div className="mt-3 text-[11px] font-semibold tracking-[0.06em]" style={{ color: '#ffd45a' }}>
                       ★ {summary.totalStars}/{summary.maxStars} · {summary.relics} {summary.relics === 1 ? 'relic' : 'relics'} recovered · {summary.runs} {summary.runs === 1 ? 'run' : 'runs'}
@@ -986,6 +991,19 @@ function VictoryPanel({ distance, clears, lives, summary, onRestart, onExit }) {
         <BackBtn onExit={onExit} />
       </div>
     </Overlay>
+  );
+}
+
+// A small "hear the temple" speaker chip — plays a beat's narration on tap (a
+// user gesture, so it isn't blocked by autoplay policy). Silent if the VO file
+// isn't present yet. Hidden entirely if the browser can't play audio.
+function VOButton({ k }) {
+  return (
+    <button onClick={() => playVO(k)}
+      className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition hover:brightness-110"
+      style={{ background: 'rgba(28,19,11,0.7)', border: '1px solid #ffb45444', color: '#ffd99a' }}>
+      <span style={{ fontSize: 13 }}>🔊</span> Hear the temple
+    </button>
   );
 }
 
