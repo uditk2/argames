@@ -60,17 +60,18 @@ def sh(cmd):
     return subprocess.check_output(cmd, shell=True, text=True).strip()
 
 
-def synth(text, lang_code, voice_name, token):
+def synth(text, lang_code, voice_name, token, project):
     body = json.dumps({
         'input': {'text': text},
         'voice': {'languageCode': lang_code, 'name': voice_name},
         'audioConfig': {'audioEncoding': 'MP3', 'speakingRate': 0.94, 'pitch': -2.0},
     }).encode('utf-8')
-    req = urllib.request.Request(
-        'https://texttospeech.googleapis.com/v1/text:synthesize',
-        data=body,
-        headers={'Authorization': f'Bearer {token}', 'Content-Type': 'application/json; charset=utf-8'},
-    )
+    headers = {'Authorization': f'Bearer {token}', 'Content-Type': 'application/json; charset=utf-8'}
+    # User ADC tokens need a QUOTA PROJECT for the API — pass it explicitly so we
+    # don't depend on `gcloud auth application-default set-quota-project`.
+    if project:
+        headers['x-goog-user-project'] = project
+    req = urllib.request.Request('https://texttospeech.googleapis.com/v1/text:synthesize', data=body, headers=headers)
     with urllib.request.urlopen(req) as r:
         return base64.b64decode(json.loads(r.read())['audioContent'])
 
@@ -80,6 +81,14 @@ def main():
         token = sh('gcloud auth print-access-token')
     except Exception:
         sys.exit('ERROR: `gcloud auth print-access-token` failed — run `gcloud auth login` first.')
+    # Quota project for the API: env override, else the active gcloud project.
+    project = os.environ.get('GCP_PROJECT') or os.environ.get('GOOGLE_CLOUD_PROJECT') or ''
+    if not project:
+        try: project = sh('gcloud config get-value project 2>/dev/null')
+        except Exception: project = ''
+    if project in ('', '(unset)'):
+        sys.exit('ERROR: no project set. Run `gcloud config set project seerly` (or set GCP_PROJECT).')
+    print(f'Using quota project: {project}')
     voices = {'en': (VOICE_EN, 'en-IN'), 'hi': (VOICE_HI, 'hi-IN')}
     for lang, (voice, code) in voices.items():
         d = os.path.join(OUT_DIR, lang)
@@ -87,7 +96,7 @@ def main():
         for key, texts in LINES.items():
             out = os.path.join(d, f'{key}.mp3')
             try:
-                audio = synth(texts[lang], code, voice, token)
+                audio = synth(texts[lang], code, voice, token, project)
                 with open(out, 'wb') as f:
                     f.write(audio)
                 print(f'  ok  {lang}/{key}.mp3  ({len(audio)//1024} KB)')
