@@ -182,6 +182,16 @@ export const CHARACTERS = {
     // temple's torchlight instead of flat/cool — matched to the corridor palette.
     tint: 0xd9b385,
   },
+  vikram: {
+    id: 'vikram', name: 'Vikram', title: 'relic hunter', tagline: 'Vikram, relic hunter',
+    sprites: {
+      run:  { dir: assetUrl('assets/temple/char/vikram/run'),  count: 19 },
+      jump: { dir: assetUrl('assets/temple/char/vikram/jump'), count: 24 },
+      duck: { dir: assetUrl('assets/temple/char/vikram/duck'), count: 24 },
+    },
+    jumpLift: 1.1, duckDrop: 0.5,
+    tint: 0xd9b385,
+  },
   // Legacy sheet kept available (?character=classic) but no longer the default —
   // it reads as Nathan Drake (IP risk), which the new hunters exist to replace.
   classic: {

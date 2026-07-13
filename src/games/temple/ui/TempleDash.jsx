@@ -24,7 +24,7 @@
 // entirely here — the engine never sees it (it only reports phase/state).
 // ===========================================================================
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { ASSETS, RUN_TO_MOVE, AVATAR_IDENTITY } from '../config.js';
+import { ASSETS, RUN_TO_MOVE, AVATAR_IDENTITY, CHARACTERS, getSelectedCharacter, setSelectedCharacter } from '../config.js';
 import { assetUrl } from '../assetUrl.js';
 // GRID ENGINE (default): the 3D world, the navigation and the minimap are all
 // built from the SAME grid labyrinth, so every corridor the map shows is
@@ -106,6 +106,10 @@ export default function TempleDash({ onExit }) {
   const [starsByLevel, setStarsByLevel] = useState(() => progress.getStarsByLevel());
   const [summary, setSummary] = useState(() => progress.getSummary());
   const [lastResult, setLastResult] = useState(null);   // { stars, best, isBestTime }
+  // Selected playable hunter (persisted in localStorage; the engine reads it at
+  // avatar creation, so choosing on the wizard takes effect on the next run).
+  const [character, setCharacterState] = useState(() => getSelectedCharacter().id);
+  const pickCharacter = useCallback((id) => { setSelectedCharacter(id); setCharacterState(id); }, []);
   const refreshProgress = useCallback(() => { setStarsByLevel(progress.getStarsByLevel()); setSummary(progress.getSummary()); }, []);
 
   // --- campaign state (persists across level loads) ---
@@ -711,7 +715,7 @@ export default function TempleDash({ onExit }) {
                   <p className="text-[13.5px] italic leading-snug px-3" style={{ color: '#e8c79a' }}>
                     “Surya's gem has kept this temple standing. You've come to take it anyway.”
                   </p>
-                  <div className="mt-2 text-[11px] font-semibold" style={{ color: '#ffb454' }}>You are {AVATAR_IDENTITY.tagline}</div>
+                  <CharacterPicker selected={character} onPick={pickCharacter} />
                   <VOButton k="premise" />
                 </div>
               )}
@@ -991,6 +995,35 @@ function VictoryPanel({ distance, clears, lives, summary, onRestart, onExit }) {
         <BackBtn onExit={onExit} />
       </div>
     </Overlay>
+  );
+}
+
+// CHARACTER PICKER — choose your hunter on the wizard's first step. One tile per
+// playable character (the legacy 'classic' sheet is hidden), each showing a
+// back-view run frame + name; the pick persists to localStorage and the engine
+// reads it at the next run. Selecting is instant and requires no reload.
+function CharacterPicker({ selected, onPick }) {
+  const ids = Object.keys(CHARACTERS).filter((id) => id !== 'classic');
+  const sel = CHARACTERS[selected] || CHARACTERS[ids[0]];
+  return (
+    <div className="mt-3">
+      <div className="text-[10px] font-black uppercase tracking-[0.22em] mb-1.5" style={{ color: '#ffb454' }}>Choose your hunter</div>
+      <div className="flex items-stretch justify-center gap-2">
+        {ids.map((id) => {
+          const c = CHARACTERS[id]; const on = id === selected;
+          return (
+            <button key={id} onClick={() => onPick(id)}
+              className="flex flex-col items-center rounded-xl px-3 py-2 transition active:scale-95"
+              style={{ background: on ? 'rgba(255,180,60,0.16)' : 'rgba(28,19,11,0.6)', border: `2px solid ${on ? '#ffd45a' : '#ffffff1f'}`, boxShadow: on ? '0 0 12px rgba(255,180,60,0.4)' : 'none', minWidth: 88 }}>
+              <img src={assetUrl(`assets/temple/char/${id}/run/r_00.webp`)} alt={c.name} draggable={false}
+                className="select-none" style={{ height: 66, width: 'auto', objectFit: 'contain', filter: on ? 'none' : 'brightness(0.8) saturate(0.85)' }} />
+              <span className="font-display font-black text-[13px] mt-0.5" style={{ color: on ? '#ffe6a4' : '#c9a878' }}>{c.name}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div className="mt-1.5 text-[11px] font-semibold" style={{ color: '#ffb454' }}>You are {sel.tagline}</div>
+    </div>
   );
 }
 
