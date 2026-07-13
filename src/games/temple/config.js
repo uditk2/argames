@@ -160,6 +160,55 @@ export const AVATAR = {
   duckDrop: 1.7,      // how far the avatar visually dips on duck — deep enough to clearly pass UNDER the blade
 };
 
+// ---- PLAYABLE CHARACTERS (sprite sets) -------------------------------------
+// Each character is an original relic hunter with its own run/jump/duck sprite
+// set (green-screen video → keyed → sliced) plus its own jump/duck LIFT tuning
+// (Mira's sheets carry the vertical motion in-sprite, so she needs far less
+// engine lift than the legacy sheets). The selected character id is stored in
+// localStorage; the engine reads getSelectedCharacter() at avatar creation.
+// Add a new hunter by dropping frames under char/<id>/{run,jump,duck} and adding
+// an entry here — nothing else needs to change.
+export const CHARACTERS = {
+  mira: {
+    id: 'mira', name: 'Mira', title: 'relic hunter', tagline: 'Mira, relic hunter',
+    sprites: {
+      run:  { dir: assetUrl('assets/temple/char/mira/run'),  count: 19 },
+      jump: { dir: assetUrl('assets/temple/char/mira/jump'), count: 24 },
+      duck: { dir: assetUrl('assets/temple/char/mira/duck'), count: 24 },
+    },
+    // sprite already rises/crouches, so keep the engine lift small (just a touch of pop).
+    jumpLift: 1.1, duckDrop: 0.5,
+  },
+  // Legacy sheet kept available (?character=classic) but no longer the default —
+  // it reads as Nathan Drake (IP risk), which the new hunters exist to replace.
+  classic: {
+    id: 'classic', name: 'Adventurer', title: 'treasure hunter', tagline: 'the adventurer',
+    sprites: {
+      run:  { dir: assetUrl('assets/temple/char/run'),  count: 19 },
+      jump: { dir: assetUrl('assets/temple/char/jump'), count: 24 },
+      duck: { dir: assetUrl('assets/temple/char/duck'), count: 24 },
+    },
+    jumpLift: 3.1, duckDrop: 1.7,
+  },
+};
+export const DEFAULT_CHARACTER = 'mira';
+const CHARACTER_KEY = 'relichunter.character';
+// The selected hunter: URL ?character=<id> wins (QA/deep-link), else localStorage,
+// else the default. Always returns a valid CHARACTERS entry.
+export function getSelectedCharacter() {
+  let id = DEFAULT_CHARACTER;
+  try {
+    const q = new URLSearchParams(location.search).get('character');
+    if (q && CHARACTERS[q]) id = q;
+    else { const s = localStorage.getItem(CHARACTER_KEY); if (s && CHARACTERS[s]) id = s; }
+  } catch { /* SSR/tests */ }
+  return CHARACTERS[id] || CHARACTERS[DEFAULT_CHARACTER];
+}
+export function setSelectedCharacter(id) {
+  if (!CHARACTERS[id]) return;
+  try { localStorage.setItem(CHARACTER_KEY, id); } catch { /* SSR/tests */ }
+}
+
 // ---- RUN-TO-MOVE (player-driven pace) --------------------------------------
 // When ON, the runner only advances while a RUN input is held (keyboard Shift, or
 // the on-screen RUN button; later: run-in-place via webcam cadence). Stopping lets

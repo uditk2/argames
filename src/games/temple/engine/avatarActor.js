@@ -16,11 +16,14 @@
 // `fallY`/`fallP` = pit-fall drop (world units) and progress 0..1 — computed by
 // the engine so camera + avatar share the exact same plunge.
 // ===========================================================================
-import { AVATAR } from '../config.js';
+import { AVATAR, getSelectedCharacter } from '../config.js';
 import { makeSpriteSheets } from './spriteSheets.js';
 
-export function createAvatarActor({ THREE, scene, ALIGN = { avatarScale: 1, avatarLift: 0 } } = {}) {
-  const sprite = makeSpriteSheets(THREE);
+export function createAvatarActor({ THREE, scene, ALIGN = { avatarScale: 1, avatarLift: 0 }, character } = {}) {
+  const CHAR = character || getSelectedCharacter();
+  const JUMP_LIFT = (CHAR && CHAR.jumpLift != null) ? CHAR.jumpLift : AVATAR.jumpLift;
+  const DUCK_DROP = (CHAR && CHAR.duckDrop != null) ? CHAR.duckDrop : AVATAR.duckDrop;
+  const sprite = makeSpriteSheets(THREE, CHAR && CHAR.sprites);
   const mat = new THREE.MeshBasicMaterial({ transparent: true, side: THREE.DoubleSide, depthWrite: false });
   const geo = new THREE.PlaneGeometry(AVATAR.height * AVATAR.aspect, AVATAR.height);
   const mesh = new THREE.Mesh(geo, mat);
@@ -53,8 +56,8 @@ export function createAvatarActor({ THREE, scene, ALIGN = { avatarScale: 1, avat
     if (tex && mat.map !== tex) { mat.map = tex; mat.needsUpdate = true; }
 
     // ---- placement: feet on the floor, lift on jump / dip on duck -------------
-    const lift = anim === 'jump' ? Math.sin(Math.min(1, animT / sheet.count) * Math.PI) * AVATAR.jumpLift : 0;
-    const drop = anim === 'duck' ? Math.sin(Math.min(1, animT / sheet.count) * Math.PI) * AVATAR.duckDrop : 0;
+    const lift = anim === 'jump' ? Math.sin(Math.min(1, animT / sheet.count) * Math.PI) * JUMP_LIFT : 0;
+    const drop = anim === 'duck' ? Math.sin(Math.min(1, animT / sheet.count) * Math.PI) * DUCK_DROP : 0;
     const footY = AVATAR.yOffset + (AVATAR.height * ALIGN.avatarScale) / 2 + ALIGN.avatarLift;
     mesh.position.set(pos.x, footY + lift - drop, pos.z);
     mesh.quaternion.copy(camQuat);   // billboard: face the (un-rolled) camera
