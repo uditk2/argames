@@ -67,7 +67,9 @@ def synth(text, lang_code, voice_name, token, project):
     body = json.dumps({
         'input': {'text': text},
         'voice': {'languageCode': lang_code, 'name': voice_name},
-        'audioConfig': {'audioEncoding': 'MP3', 'speakingRate': 0.94, 'pitch': -2.0},
+        # NB: Chirp3-HD voices reject `pitch` (and are picky about extras), so we
+        # keep audioConfig minimal — just a slightly slower, grave delivery.
+        'audioConfig': {'audioEncoding': 'MP3', 'speakingRate': 0.92},
     }).encode('utf-8')
     url = 'https://texttospeech.googleapis.com/v1/text:synthesize'
     headers = {'Content-Type': 'application/json; charset=utf-8'}

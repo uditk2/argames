@@ -66,6 +66,7 @@ const START_LIVES = 3;
 const VO_LANG = (() => { try { return (navigator.language || 'en').toLowerCase().startsWith('hi') ? 'hi' : 'en'; } catch { return 'en'; } })();
 let _voAudio = null;
 function playVO(key) {
+  if (!key) return;
   try {
     if (_voAudio) { try { _voAudio.pause(); } catch { /* ignore */ } _voAudio = null; }
     const a = new Audio(assetUrl(`assets/temple/vo/${VO_LANG}/${key}.mp3`));
@@ -283,12 +284,14 @@ export default function TempleDash({ onExit }) {
             level: idx + 1, lives_left: after,
           });
           if (after <= 0) event('temple_game_over', { distance: st.distance, clears: st.clears, level: idx + 1 });
+          playVO(after <= 0 ? 'gameover' : 'retry');   // "The temple keeps you." / "Not yet…"
         }
         // CrazyGames: also stop on the edge into 'won' (level clear / escape). The
         // between-levels midgame ad is fired from nextLevel, AFTER this stop.
         if (st.phase === 'won' && lastPhaseRef.current !== 'won') {
           CG.gameplayStop();
           const last = idx >= LEVELS.length - 1;
+          playVO(last ? 'victory' : idx === 4 ? 'grab' : null);   // Syamantaka grab (L5) / final victory (L6)
           // record best time + stars for this level (time left on the clock vs budget).
           const budget = (engRef.current && engRef.current.budgetS) || 0;
           const res = progress.recordClear(idx, st.timeLeft != null ? st.timeLeft : 0, budget);
@@ -342,6 +345,7 @@ export default function TempleDash({ onExit }) {
     if (rt > 0) {
       eng.setReadingHold(true);
       setReading({ secs: rt });
+      playVO(`l${idx + 1}`);   // the temple narrates this trial's line over the study screen
       if (readTimerRef.current) clearInterval(readTimerRef.current);
       let left = rt;
       readTimerRef.current = setInterval(() => {
