@@ -32,9 +32,9 @@ const CLEARS = {
   duck: (h) => h.type === 'blade' || (h.type === 'fire' && h.duck),
 };
 const CUES = {
-  blade: { text: 'DUCK!', color: '#ff4a3a' },
-  crack: { text: 'JUMP!', color: '#ffd23a' },
-  fire: (h) => ({ text: h.duck ? 'DUCK!' : 'JUMP!', color: '#ff7a1e' }),
+  blade: { text: 'DUCK!', color: '#ff4a3a', action: 'duck' },
+  crack: { text: 'JUMP!', color: '#ffd23a', action: 'jump' },
+  fire: (h) => ({ text: h.duck ? 'DUCK!' : 'JUMP!', color: '#ff7a1e', action: h.duck ? 'duck' : 'jump' }),
   // beams are non-lethal + readable on the floor: no telegraph (parity with the original).
 };
 

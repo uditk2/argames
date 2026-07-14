@@ -61,6 +61,15 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
   const RELIC_KEY = 'temple_relic_taken';
   function relicTaken() { try { return sessionStorage.getItem(RELIC_KEY) === '1'; } catch { return false; } }
   function setRelicTaken(v) { try { v ? sessionStorage.setItem(RELIC_KEY, '1') : sessionStorage.removeItem(RELIC_KEY); } catch { /* SSR/tests */ } }
+  // FIRST-ENCOUNTER TEACH: the very first blade (DUCK) / crack-or-beam (JUMP) the
+  // player ever meets slows time and holds a big prompt until they react — taught
+  // once EVER (localStorage), so veterans never see slow-mo. Just-in-time teaching
+  // keeps the intro short (CrazyGames-friendly) without leaving new inputs unexplained.
+  const taughtKey = (a) => `relichunter.taught.${a}`;
+  function isTaught(a) { try { return localStorage.getItem(taughtKey(a)) === '1'; } catch { return true; } }
+  function markTaught(a) { try { localStorage.setItem(taughtKey(a), '1'); } catch { /* SSR */ } }
+  let teachAction = null, teachT = 0, teachCueAcc = 0;   // 'jump'|'duck' being taught; real-time held
+  const TEACH_SLOW = 0.4, TEACH_MAX_S = 6;   // dt scale during the teach; safety cap
 
   // ---- three.js scene ---------------------------------------------------------
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
@@ -268,7 +277,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     phase = 'run'; collapseArmed = false; runT = 0; runDist = 0; clears = 0;
     deathCause = null; winT = 0; stuckT = 0; sliceT = 0; stuckWarned = false; stuckAction = 'jump';
     falling = false; fallT = 0; duckUntil = -1; doorCued = false;
-    hop = 0; dip = 0; hopV = 0; dipV = 0; sealShake = 0;
+    hop = 0; dip = 0; hopV = 0; dipV = 0; sealShake = 0; teachAction = null; teachT = 0; teachCueAcc = 0;
     const hv = nav.headingVec(); camFwd.x = hv.x; camFwd.z = hv.z;
     rigInit = false;
     audio.ambient(false);
@@ -325,7 +334,12 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
 
   // ---- hazard consequences (gridHazards reports, the engine decides) -----------
   function onHazardEvent(evt, payload) {
-    if (evt === 'cue') { cue(payload.text, payload.color); return; }
+    if (evt === 'cue') {
+      cue(payload.text, payload.color);
+      // first time we ever telegraph this action → enter the slow-mo teach.
+      if (payload.action && !teachAction && !isTaught(payload.action)) { teachAction = payload.action; teachT = 0; }
+      return;
+    }
     if (evt === 'beam') getStuck('jump');
     else if (evt === 'blade') die('blade', 'SLICED!', '#ff2e22');
     else if (evt === 'fire') die('fire', 'BURNED!', '#ff7a1e');
@@ -337,6 +351,8 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
   function input(action) {
     if (readingHold) return;
     audio.resume();
+    // reacting with the taught input ends the teach (and never slow-mos it again).
+    if (teachAction && action === teachAction) { markTaught(teachAction); teachAction = null; }
     if (action === 'duck') duckUntil = performance.now() + DUCK_WINDOW;
     if (action === 'runStart') { runHeld = true; return; }
     if (action === 'runStop') { runHeld = false; return; }
@@ -422,8 +438,23 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
       if (!running) return;
       raf = requestAnimationFrame(animate); return;
     }
-    const dt = Math.min(50, rawMs) / 1000;
+    let dt = Math.min(50, rawMs) / 1000;
     const tnow = now * 0.001;
+    // FIRST-ENCOUNTER TEACH: slow the whole sim while holding the input prompt so a
+    // new player has time to read + react. Ends on the correct press (input()) or a
+    // safety timeout. Cancelled if the run isn't active.
+    if (teachAction) {
+      if (phase !== 'run') { teachAction = null; teachCueAcc = 0; }
+      else {
+        teachT += dt;                                   // real-time (unscaled) for the cap
+        if (teachT >= TEACH_MAX_S) { markTaught(teachAction); teachAction = null; teachCueAcc = 0; }
+        else {
+          dt *= TEACH_SLOW;
+          teachCueAcc += rawMs / 1000;                  // re-assert the big prompt ~every 0.5s
+          if (teachCueAcc >= 0.5) { teachCueAcc = 0; cue(teachAction === 'duck' ? '↓ DUCK' : '↑ JUMP', teachAction === 'duck' ? '#ff4a3a' : '#ffd23a'); }
+        }
+      }
+    }
 
     props.update(dt, tnow);   // blade swings + flame sheet
     if (relic) relic.update(dt, tnow);   // idle float/pulse + grab burst
