@@ -747,6 +747,13 @@ export default function TempleDash({ onExit }) {
           70%  { opacity: 1; }
           100% { opacity: 0; transform: translate(-50%,-50%) scale(1.0); }
         }
+        @keyframes temple-life-lost {
+          0%   { transform: scale(1.4) rotate(-9deg); filter: brightness(2.2) sepia(1) hue-rotate(-28deg) saturate(5); opacity: 1; }
+          35%  { transform: scale(0.82) rotate(7deg); filter: brightness(1.6) saturate(2); }
+          65%  { transform: scale(1.08) rotate(-3deg); filter: brightness(1.1); }
+          100% { transform: scale(1) rotate(0deg); filter: none; opacity: 0.85; }
+        }
+        .temple-life-lost { animation: temple-life-lost 520ms cubic-bezier(0.36,0.07,0.19,0.97) both; }
         @keyframes temple-timer-pulse {
           0%, 100% { transform: scale(1.0); opacity: 1; }
           50%      { transform: scale(1.12); opacity: 0.78; }
@@ -817,19 +824,26 @@ function CollapseTimer({ timeLeft, urgent, armed }) {
 }
 
 // Lives as ankh life-tokens (full glowing gold = remaining, cracked stone = lost).
+// Losing one is a MOMENT: the token that just flipped shatters/gutters out with a
+// red-flash wobble (temple-life-lost keyframe) so a lost life is felt, not just
+// swapped. The just-lost index is the one that flips full→lost as `lives` drops.
 function LivesRow({ lives }) {
+  const prev = useRef(lives);
+  const justLost = lives < prev.current ? lives : -1;   // 0-based index that just died
+  useEffect(() => { prev.current = lives; }, [lives]);
   return (
     <div className="flex items-center justify-center gap-1.5 mt-1">
       {Array.from({ length: START_LIVES }).map((_, i) => {
         const alive = i < lives;
+        const lostNow = i === justLost;
         return (
           <img
-            key={i}
+            key={lostNow ? `lost-${lives}-${i}` : i}
             src={alive ? assetUrl('assets/temple/life_full.webp') : assetUrl('assets/temple/life_lost.webp')}
             alt={alive ? 'life' : 'life lost'}
             width={20}
             height={20}
-            className="select-none"
+            className={`select-none${lostNow ? ' temple-life-lost' : ''}`}
             draggable={false}
             style={{ opacity: alive ? 1 : 0.85 }}
           />
