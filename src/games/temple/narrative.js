@@ -16,8 +16,8 @@
 
 // Premise, shown on the wizard's first step (and line 1 of the VO script).
 export const PREMISE = {
-  en: "A thousand years ago, Surya's own gem — the Syamantaka — was sealed in a temple built by Maya himself, so no unworthy hand would ever hold it. You've come to take it anyway.",
-  hi: 'हज़ार साल पहले, सूर्य का रत्न स्यमंतक, माया के बनाए मंदिर में छिपा दिया गया — ताकि कोई अयोग्य हाथ उसे छू न सके। तुम फिर भी आए हो।',
+  en: "Surya, the sun, forged the Syamantaka — a gem that blesses the worthy and buries the rest. For an age it was lost. Last we heard, it lies sealed in this temple. You are a relic hunter, come to take it back — for all of us.",
+  hi: 'सूर्य ने स्वयं स्यमंतक रत्न गढ़ा — जो योग्य को वरदान देता है, और बाक़ी को दफ़ना देता है। युगों तक यह खोया रहा। आख़िरी बार सुना था, यह इसी मंदिर में बंद है। तुम एक खोजी हो, इसे वापस लाने आए हो — हम सबके लिए।',
 };
 
 // One line per level, shown on that level's study screen (and VO lines 2–6, 8).
