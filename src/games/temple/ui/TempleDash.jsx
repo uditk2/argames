@@ -379,6 +379,20 @@ export default function TempleDash({ onExit }) {
     if (n >= 1 && n <= LEVELS.length) { deepLinkRef.current = true; startCampaign(n - 1); }
   }, [startCampaign]);
 
+  // OPENING STORY: narrate the whole premise once, at the start. Browsers block
+  // audio before a user gesture, so we fire on the FIRST interaction with the intro
+  // (a click/keypress anywhere — including the Play button). The clip keeps playing
+  // into the first study screen, so the full legend is heard even at ≤1 click.
+  const introVOPlayed = useRef(false);
+  useEffect(() => {
+    if (screen !== 'intro' || introVOPlayed.current) return undefined;
+    const fire = () => { if (introVOPlayed.current) return; introVOPlayed.current = true; playVO('premise'); cleanup(); };
+    const cleanup = () => { window.removeEventListener('pointerdown', fire); window.removeEventListener('keydown', fire); };
+    window.addEventListener('pointerdown', fire);
+    window.addEventListener('keydown', fire);
+    return cleanup;
+  }, [screen]);
+
   // REWARDED-AD REVIVE (CrazyGames only) — one continue per campaign run. Shown
   // on Game Over. Watching the rewarded video grants a life and retries the
   // current level; a skip/adblock/error just leaves the Game Over screen intact.
@@ -731,7 +745,7 @@ export default function TempleDash({ onExit }) {
 
             {/* PLAY — one click to gameplay. */}
             <div className="px-6 py-5 flex flex-col gap-2">
-              <button onClick={() => { playVO('premise'); startCampaign(0); }}
+              <button onClick={() => startCampaign(0)}
                 className="w-full py-3.5 rounded-xl font-black text-white text-lg bg-gradient-to-r from-fire to-magic shadow-glow-fire hover:brightness-110 transition">
                 ▶ {summary.furthest > 0 ? 'New run' : 'Play'}
               </button>
