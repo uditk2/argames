@@ -250,7 +250,6 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
   const DUCK_WINDOW = 480;                     // ms a duck press counts as "ducking" at the door
   let hop = 0, dip = 0, hopV = 0, dipV = 0;
   let sealShake = 0;   // decaying camera-shake pulse fired when the wall slams shut behind you
-  let autoReverseT = -1;   // >=0: counting down to auto turn-around after hitting a dead end
   const hitDeadEnds = new Set();
   let mmCanvas = minimapCanvas || null, mx = mmCanvas ? mmCanvas.getContext('2d') : null;
   // smoothed rig (heading + position) so turns/pivots swing instead of snapping
@@ -278,7 +277,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     phase = 'run'; collapseArmed = false; runT = 0; runDist = 0; clears = 0;
     deathCause = null; winT = 0; stuckT = 0; sliceT = 0; stuckWarned = false; stuckAction = 'jump';
     falling = false; fallT = 0; duckUntil = -1; doorCued = false;
-    hop = 0; dip = 0; hopV = 0; dipV = 0; sealShake = 0; teachAction = null; teachT = 0; teachCueAcc = 0; autoReverseT = -1;
+    hop = 0; dip = 0; hopV = 0; dipV = 0; sealShake = 0; teachAction = null; teachT = 0; teachCueAcc = 0;
     const hv = nav.headingVec(); camFwd.x = hv.x; camFwd.z = hv.z;
     rigInit = false;
     audio.ambient(false);
@@ -354,8 +353,6 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     audio.resume();
     // reacting with the taught input ends the teach (and never slow-mos it again).
     if (teachAction && action === teachAction) { markTaught(teachAction); teachAction = null; }
-    // any deliberate move cancels a pending dead-end auto-reverse (player took control).
-    if (action === 'left' || action === 'right' || action === 'uturn') autoReverseT = -1;
     if (action === 'duck') duckUntil = performance.now() + DUCK_WINDOW;
     if (action === 'runStart') { runHeld = true; return; }
     if (action === 'runStop') { runHeld = false; return; }
@@ -509,17 +506,10 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
         const cell = nav.cell;
         if (nav.isDeadEnd(cell.r, cell.c)) {
           hitDeadEnds.add(cell.r * maze.cols + cell.c);
-          cue('DEAD END', '#ff6a52'); audio.back();
-          autoReverseT = 0.55;   // bounce back out so the player is never stuck facing a wall
+          cue('DEAD END — Q TO TURN BACK', '#ff6a52'); audio.back();
         } else {
           cue('WHICH WAY?', '#ffd23a');
         }
-      }
-      // auto turn-around out of a dead end (a beat after the stop). A manual turn /
-      // U-turn cancels it (autoReverseT reset in input()).
-      if (autoReverseT >= 0) {
-        autoReverseT -= dt;
-        if (autoReverseT <= 0) { autoReverseT = -1; if (nav.turnAround()) { cue('BACK', '#ffd99a'); audio.back(); } }
       }
       // TIP re-aim: no-op until the player crosses into a different corridor run
       // or reverses — then that run's projection re-anchors to their entry point.

@@ -94,10 +94,12 @@ export function createGridNav(maze, { speed = 6, cellW = 10 } = {}) {
     // corridor is entered cleanly; mid-stride turns keep t (cutting the corner).
     if (openDir(r, c, want)) { heading = want; if (atWall || t >= 1) t = 0; atWall = false; return true; }
     if (atWall) {
+      // at a wall/corner, ←/→ takes the OTHER open side if the pressed one is closed
+      // (auto-corrects an L-turn). It does NOT fall back to reversing — turning back
+      // is the deliberate U-turn (Q / turnAround), so a dead end never reverses by
+      // accident on a turn key.
       const other = dir === 'L' ? RIGHT[heading] : LEFT[heading];
       if (openDir(r, c, other)) { heading = other; atWall = false; t = 0; return true; }
-      const back = BACK[heading];
-      if (openDir(r, c, back)) { heading = back; atWall = false; t = 0; return true; }
     }
     return false;
   }
