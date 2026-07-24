@@ -865,30 +865,34 @@ function CollapseTimer({ timeLeft, urgent, armed }) {
   );
 }
 
-// Lives as ankh life-tokens (full glowing gold = remaining, cracked stone = lost).
-// Losing one is a MOMENT: the token that just flipped shatters/gutters out with a
-// red-flash wobble (temple-life-lost keyframe) so a lost life is felt, not just
-// swapped. The just-lost index is the one that flips full→lost as `lives` drops.
+// Lives shown as mini-hunter tokens: three little back-view portraits of the
+// chosen hunter in a gold ring. A remaining life is warm + glowing; a lost one
+// greys out, and the token that JUST died shatters (temple-life-lost keyframe) so
+// a lost life is felt, not silently swapped.
 function LivesRow({ lives }) {
+  const id = getSelectedCharacter().id;
+  const src = assetUrl(`assets/temple/char/${id}/run/r_00.webp`);
   const prev = useRef(lives);
-  const justLost = lives < prev.current ? lives : -1;   // 0-based index that just died
+  const justLost = lives < prev.current ? lives : -1;
   useEffect(() => { prev.current = lives; }, [lives]);
   return (
-    <div className="flex items-center justify-center gap-1.5 mt-1">
+    <div className="flex items-center justify-center gap-2 mt-1">
       {Array.from({ length: START_LIVES }).map((_, i) => {
         const alive = i < lives;
         const lostNow = i === justLost;
         return (
-          <img
-            key={lostNow ? `lost-${lives}-${i}` : i}
-            src={alive ? assetUrl('assets/temple/life_full.webp') : assetUrl('assets/temple/life_lost.webp')}
-            alt={alive ? 'life' : 'life lost'}
-            width={20}
-            height={20}
-            className={`select-none${lostNow ? ' temple-life-lost' : ''}`}
-            draggable={false}
-            style={{ opacity: alive ? 1 : 0.85 }}
-          />
+          <div key={lostNow ? `lost-${lives}-${i}` : i}
+            className={`relative rounded-full overflow-hidden select-none${lostNow ? ' temple-life-lost' : ''}`}
+            style={{
+              width: 26, height: 26,
+              border: `2px solid ${alive ? '#ffd45a' : '#5a4a34'}`,
+              background: 'radial-gradient(circle at 50% 35%, #3a2a16, #0e0805)',
+              boxShadow: alive ? '0 0 9px rgba(255,180,60,0.55)' : 'none',
+              opacity: alive ? 1 : 0.55,
+            }}>
+            <img src={src} alt={alive ? 'life' : 'lost'} draggable={false}
+              style={{ position: 'absolute', left: '50%', top: '14%', transform: 'translateX(-50%)', height: '150%', width: 'auto', objectFit: 'contain', filter: alive ? 'brightness(1.05) saturate(1.05)' : 'grayscale(1) brightness(0.55)' }} />
+          </div>
         );
       })}
     </div>
