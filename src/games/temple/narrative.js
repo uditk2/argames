@@ -39,7 +39,7 @@ export const GRAB_LINE = {
 
 // Endings.
 export const VICTORY_LINE = {
-  en: 'The unworthy are kept. You were not. The Syamantaka has chosen its hunter.',
+  en: 'The unworthy are kept. You were not. The Syamantaka Gem has chosen its hunter.',
   hi: 'अयोग्य यहीं रह जाते हैं। तुम नहीं रुके। स्यमंतक ने अपना शिकारी चुन लिया।',
 };
 export const GAMEOVER_LINE = { en: 'The temple keeps you.', hi: 'मंदिर तुम्हें रख लेता है।' };

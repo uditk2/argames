@@ -713,7 +713,7 @@ export default function TempleDash({ onExit }) {
 
             <div className="px-6 pt-3">
               <p className="text-[13.5px] italic leading-snug" style={{ color: '#e8c79a' }}>
-                “Surya's gem has kept this temple standing. You've come to take it anyway.”
+                “The Syamantaka Gem has kept this temple standing a thousand years. You've come to take it anyway.”
               </p>
               <VOButton k="premise" />
               <CharacterPicker selected={character} onPick={pickCharacter} />
@@ -1149,7 +1149,7 @@ function IntroMap() {
 // a check, the current step glows, upcoming steps are dim. `current` is 0-based.
 const JOURNEY_STEPS = [
   { n: 1, label: 'Halls' }, { n: 2, label: 'Blades' }, { n: 3, label: 'The Deep' },
-  { n: 4, label: "Lion's Maw" }, { n: 5, label: 'Syamantaka', icon: '🏆' }, { n: 6, label: 'Daylight', icon: '🚪' },
+  { n: 4, label: "Lion's Maw" }, { n: 5, label: 'The Gem', icon: '🏆' }, { n: 6, label: 'Daylight', icon: '🚪' },
 ];
 // Three star sockets — filled gold up to `n`, empty (dim outline) beyond. The
 // empty sockets are the deliberate open loop: the player sees exactly what's left
