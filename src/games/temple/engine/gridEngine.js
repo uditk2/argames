@@ -221,11 +221,25 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     carryGlow = new THREE.PointLight(0xffd24a, 2.0, CELL * 2.2, 2.0);
     scene.add(carryGlow);
   }
-  // L6 ESCAPE: a boulder rolls the solution route behind you (one-time chase).
+  // L6 ESCAPE: a boulder rolls STRAIGHT down the entrance corridor behind you and
+  // can't turn — your escape route turns off the maze, it smashes into the wall
+  // ahead and crashes (never reaches the exit). Turning off its line is the escape.
   const CHASE = !!mp.chase;
   const CRUSH_R = mp.crushRadius || CELL * 0.55;
+  const straightRun = (start, heading) => {
+    const D = { N: [-1, 0], S: [1, 0], E: [0, 1], W: [0, -1] };
+    const cells = [{ r: start.r, c: start.c }]; let r = start.r, c = start.c, g = 0;
+    while (g++ < 80) {
+      if (!maze.grid[r] || !maze.grid[r][c] || maze.grid[r][c][heading]) break;   // wall ahead
+      const [dr, dc] = D[heading]; r += dr; c += dc;
+      if (r < 0 || r >= maze.rows || c < 0 || c >= maze.cols) break;
+      cells.push({ r, c });
+    }
+    return cells;
+  };
   const boulder = CHASE ? createBoulderChase({
-    THREE, scene, path, cellW: CELL, H, speed: mp.boulderSpeed || SPD * 1.12, startBehind: 2.6,
+    THREE, scene, path: straightRun(maze.entrance, nav.heading), cellW: CELL, H,
+    speed: mp.boulderSpeed || SPD * 1.12, startBehind: 2.6,
   }) : null;
   let boulderStarted = false;
   // STONE DOOR (L1-L4): a slab just past the exit cell's centre, lowering with the timer.
@@ -484,6 +498,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     // ---- boulder chase: roll it, rumble as it nears, crush on contact ------------
     if (boulder) {
       const bp = boulder.update(phase === 'run' ? dt : 0, phase === 'run');
+      if (boulder.takeCrash()) { boulderShake = 1; audio.seal(); cue('IT CRASHED!', '#ffd99a'); }   // slams into the wall it can't turn past
       if (phase === 'run' && !boulder.gone) {
         const pp = nav.worldPos();
         const d = Math.hypot(bp.x - pp.x, bp.z - pp.z);

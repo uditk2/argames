@@ -37,42 +37,40 @@ export function createBoulderChase({ THREE, scene, path = [], cellW = 14, H = 7,
   scene.add(mesh);
 
   const startArc = -Math.abs(startBehind) * cellW;
-  let arc = startArc, rolling = false, rollAngle = 0, gone = false;
+  let arc = startArc, rolling = false, rollAngle = 0, gone = false, crashT = -1, crashFired = false;
 
   function posAt(a) {
     if (a <= 0) {                              // behind the entrance — extrapolate back
       const dir = new THREE.Vector3().subVectors(pts[1], pts[0]).normalize();
       return new THREE.Vector3().copy(pts[0]).addScaledVector(dir, a);
     }
-    if (a >= total) {                          // past the exit — keep rolling into daylight
-      const n = pts.length - 1;
-      const dir = new THREE.Vector3().subVectors(pts[n], pts[n - 1]).normalize();
-      return new THREE.Vector3().copy(pts[n]).addScaledVector(dir, a - total);
-    }
+    if (a >= total) return pts[pts.length - 1].clone();   // clamp at the wall it crashes into
     let i = 1; while (i < cum.length && cum[i] < a) i++;
     const t = (a - cum[i - 1]) / (seg[i - 1] || 1);
     return new THREE.Vector3().lerpVectors(pts[i - 1], pts[i], t);
   }
 
   function update(dt, running) {
-    if (rolling && running && !gone) arc += speed * dt;
+    if (rolling && running && !gone && crashT < 0) arc += speed * dt;
+    if (arc >= total && crashT < 0) { arc = total; crashT = 0; }   // reached the wall — crash
+    if (crashT >= 0) { crashT += dt; if (crashT > 1.1) { gone = true; mesh.visible = false; } }
     const p = posAt(arc);
-    mesh.position.set(p.x, R * 0.9, p.z);
-    // roll about the horizontal axis perpendicular to travel.
+    const bob = crashT >= 0 ? Math.max(0, 1 - crashT * 3) * R * 0.15 * Math.sin(crashT * 40) : 0;  // shudder on impact
+    mesh.position.set(p.x, R * 0.9 + bob, p.z);
     const ahead = posAt(arc + 0.1), dir = new THREE.Vector3().subVectors(ahead, p);
     dir.y = 0; if (dir.lengthSq() > 1e-6) dir.normalize(); else dir.set(0, 0, 1);
-    const axis = new THREE.Vector3(dir.z, 0, -dir.x);   // up × dir
-    rollAngle += (speed * dt) / R;
-    mesh.quaternion.setFromAxisAngle(axis, rollAngle);
-    // once it's well past the exit, it's gone (into daylight) — hide it.
-    if (arc > total + cellW * 2.2) { gone = true; mesh.visible = false; }
+    const axis = new THREE.Vector3(dir.z, 0, -dir.x);
+    if (crashT < 0) { rollAngle += (speed * dt) / R; mesh.quaternion.setFromAxisAngle(axis, rollAngle); }
     return { x: p.x, z: p.z };
   }
 
+  // true exactly once, on the frame the boulder slams into the wall (engine booms).
+  function takeCrash() { if (crashT >= 0 && !crashFired) { crashFired = true; return true; } return false; }
+
   return {
-    update,
+    update, takeCrash,
     start() { rolling = true; },
-    reset() { arc = startArc; rolling = false; rollAngle = 0; gone = false; mesh.visible = true; const p = posAt(arc); mesh.position.set(p.x, R * 0.9, p.z); },
+    reset() { arc = startArc; rolling = false; rollAngle = 0; gone = false; crashT = -1; crashFired = false; mesh.visible = true; const p = posAt(arc); mesh.position.set(p.x, R * 0.9, p.z); },
     worldPos() { const p = posAt(arc); return { x: p.x, z: p.z }; },
     get arc() { return arc; },
     get total() { return total; },
