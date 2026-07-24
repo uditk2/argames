@@ -20,8 +20,10 @@
 # ===========================================================================
 import base64, json, os, subprocess, sys, urllib.request, urllib.error
 
-VOICE_EN = os.environ.get('VOICE_EN', 'en-IN-Chirp3-HD-Charon')  # low male
-VOICE_HI = os.environ.get('VOICE_HI', 'hi-IN-Chirp3-HD-Charon')
+# Deep, grave baritone (temple-guardian mystery). Neural2/Wavenet support pitch, so
+# they get pitched down (see VO_PITCH); the language code is derived from the voice.
+VOICE_EN = os.environ.get('VOICE_EN', 'en-US-Neural2-J')   # deep US male baritone
+VOICE_HI = os.environ.get('VOICE_HI', 'hi-IN-Neural2-B')   # deep Hindi male
 OUT_DIR = os.path.join(os.path.dirname(__file__), '..', 'public', 'assets', 'temple', 'vo')
 
 # key -> { en, hi }  (mirrors src/games/temple/narrative.js)
@@ -64,12 +66,15 @@ API_KEY = os.environ.get('TTS_API_KEY', '').strip()   # simplest auth — bypass
 
 
 def synth(text, lang_code, voice_name, token, project):
+    # Chirp3-HD rejects `pitch`; Wavenet/Neural2/Studio support it, so for those we
+    # drop the pitch low for a heavy, grave baritone (temple-guardian mystery).
+    audio_cfg = {'audioEncoding': 'MP3', 'speakingRate': 0.88}
+    if 'Chirp3' not in voice_name:
+        audio_cfg['pitch'] = float(os.environ.get('VO_PITCH', '-5.0'))
     body = json.dumps({
         'input': {'text': text},
         'voice': {'languageCode': lang_code, 'name': voice_name},
-        # NB: Chirp3-HD voices reject `pitch` (and are picky about extras), so we
-        # keep audioConfig minimal — just a slightly slower, grave delivery.
-        'audioConfig': {'audioEncoding': 'MP3', 'speakingRate': 0.92},
+        'audioConfig': audio_cfg,
     }).encode('utf-8')
     url = 'https://texttospeech.googleapis.com/v1/text:synthesize'
     headers = {'Content-Type': 'application/json; charset=utf-8'}
@@ -101,7 +106,9 @@ def main():
         if project in ('', '(unset)'):
             sys.exit('ERROR: no project set. Run `gcloud config set project seerly` (or set GCP_PROJECT).')
         print(f'Using ADC token · quota project: {project}')
-    voices = {'en': (VOICE_EN, 'en-IN'), 'hi': (VOICE_HI, 'hi-IN')}
+    # language code is derived from the voice name (e.g. en-US-Neural2-J -> en-US).
+    langOf = lambda v: '-'.join(v.split('-')[:2])
+    voices = {'en': (VOICE_EN, langOf(VOICE_EN)), 'hi': (VOICE_HI, langOf(VOICE_HI))}
     for lang, (voice, code) in voices.items():
         d = os.path.join(OUT_DIR, lang)
         os.makedirs(d, exist_ok=True)
