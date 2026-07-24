@@ -385,7 +385,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
   }
 
   // buffered-turn state + resolver (see the left/right branch above)
-  const TURN_BUFFER_MS = 1000;
+  const TURN_BUFFER_MS = 1800;   // hold a ←/→ tap this long so an early press still lands at the junction
   function tryTurn() {
     if (!pendTurn || phase !== 'run') { if (phase !== 'run') pendTurn = null; return; }
     if (performance.now() - pendAt > TURN_BUFFER_MS) { pendTurn = null; return; }

@@ -834,7 +834,7 @@ function CollapseTimer({ timeLeft, urgent, armed }) {
   const label = !armed ? '– –' : (mm > 0 ? `${mm}:${String(ss).padStart(2, '0')}` : String(ss));
   const color = !armed ? '#8a765a' : urgent ? '#ff2e22' : '#ffd99a';
   return (
-    <div className="absolute top-[64px] left-3.5 z-[5] text-left flex items-center gap-2 rounded-xl px-3 py-1.5"
+    <div className="absolute top-[58px] left-1/2 -translate-x-1/2 z-[5] text-left flex items-center gap-2 rounded-xl px-3 py-1.5"
       style={{ textShadow: '0 1px 4px #000', background: 'rgba(20,12,7,0.72)', border: `1px solid ${urgent ? '#ff2e2288' : '#ffb45433'}`, opacity: armed ? 1 : 0.72 }}>
       <span className="text-[9px] font-semibold uppercase tracking-[0.18em] leading-tight" style={{ color: !armed ? '#8a765a' : urgent ? '#ff6a52' : '#ffb454' }}>
         Collapse<br />in

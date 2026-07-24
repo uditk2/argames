@@ -213,7 +213,7 @@ export function mazeStats(maze) {
 // The collapse timer is PAUSED during startGrace (free auto-run) — the engine
 // already subtracts that. Reading time (studying the map before the run) is a
 // SEPARATE, timer-off phase (readTime) so the tight budget stays fair.
-export function computeRoutePacing({ lengths, routePct, cellLen, runSpeed, slack = 0.15, reaction = 2 }) {
+export function computeRoutePacing({ lengths, routePct, cellLen, runSpeed, slack = 0.15, reaction = 4 }) {
   const targetSteps = routePercentileSteps(lengths, routePct);
   const shortest = lengths.length ? lengths[0] : 0;
   const targetLen = targetSteps * cellLen;
@@ -233,12 +233,12 @@ export function computeRoutePacing({ lengths, routePct, cellLen, runSpeed, slack
 // 40% (L1, forgiving) toward ~12% (L6, only near-optimal routing survives). readTime
 // = seconds to study the map before the run (bigger early so it isn't too tough).
 export const LEVEL_MAZE = [
-  { cols: 4, rows: 4, braid: 0.45, runSpeed: 8,  routePct: 0.40, slack: 0.28, cellLen: 22, readTime: 5, grace: 6, ending: 'door',     hazards: [] },                               // L1 calm
-  { cols: 5, rows: 4, braid: 0.48, runSpeed: 9,  routePct: 0.33, slack: 0.24, cellLen: 22, readTime: 5, grace: 5, ending: 'door',     hazards: ['blade'] },                          // L2 — teaches DUCK (blades only)
-  { cols: 5, rows: 5, braid: 0.50, runSpeed: 10, routePct: 0.27, slack: 0.20, cellLen: 21, readTime: 4, grace: 5, ending: 'door',     hazards: ['blade', 'beam', 'crack'] },         // L3 — adds JUMP (beams + cracked floor); duck retained
-  { cols: 6, rows: 5, braid: 0.52, runSpeed: 11, routePct: 0.22, slack: 0.16, cellLen: 21, readTime: 4, grace: 4, ending: 'door',     hazards: ['beam', 'blade', 'crack', 'fire'] },// L4
-  { cols: 6, rows: 6, braid: 0.55, runSpeed: 11, routePct: 0.17, slack: 0.12, cellLen: 20, readTime: 4, grace: 4, ending: 'artifact', hazards: ['beam', 'blade', 'crack', 'fire'] },// L5 (artifact)
-  { cols: 7, rows: 6, braid: 0.58, runSpeed: 13, routePct: 0.12, slack: 0.10, cellLen: 20, readTime: 3, grace: 3, ending: 'exit',     hazards: ['beam', 'blade', 'crack', 'fire'] },// L6 (escape)
+  { cols: 4, rows: 4, braid: 0.45, runSpeed: 8,  routePct: 0.40, slack: 0.55, cellLen: 22, readTime: 5, grace: 6, ending: 'door',     hazards: [] },                               // L1 calm
+  { cols: 5, rows: 4, braid: 0.48, runSpeed: 9,  routePct: 0.33, slack: 0.50, cellLen: 22, readTime: 5, grace: 5, ending: 'door',     hazards: ['blade'] },                          // L2 — teaches DUCK (blades only)
+  { cols: 5, rows: 5, braid: 0.50, runSpeed: 10, routePct: 0.27, slack: 0.45, cellLen: 21, readTime: 4, grace: 5, ending: 'door',     hazards: ['blade', 'beam', 'crack'] },         // L3 — adds JUMP (beams + cracked floor); duck retained
+  { cols: 6, rows: 5, braid: 0.52, runSpeed: 11, routePct: 0.22, slack: 0.42, cellLen: 21, readTime: 4, grace: 4, ending: 'door',     hazards: ['beam', 'blade', 'crack', 'fire'] },// L4
+  { cols: 6, rows: 6, braid: 0.55, runSpeed: 11, routePct: 0.17, slack: 0.38, cellLen: 20, readTime: 4, grace: 4, ending: 'artifact', hazards: ['beam', 'blade', 'crack', 'fire'] },// L5 (artifact)
+  { cols: 7, rows: 6, braid: 0.58, runSpeed: 13, routePct: 0.12, slack: 0.35, cellLen: 20, readTime: 3, grace: 3, ending: 'exit',     hazards: ['beam', 'blade', 'crack', 'fire'] },// L6 (escape)
 ];
 
 // ---- adapter: grid maze -> engine route -----------------------------------
