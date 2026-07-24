@@ -48,6 +48,7 @@ import * as CG from '../crazygames/sdk.js';
 // Unified analytics (GA + PostHog). Every call is a guarded no-op unless a
 // provider is configured, so this is safe in every build.
 import { event } from '../../../analytics/index.js';
+import { isLocalHost } from '../../../analytics/host.js';
 
 const IS_PHONE = typeof navigator !== 'undefined' && /Mobi|Android|iPhone|iPod/i.test(navigator.userAgent || '');
 // QA escape hatch (?nopause=1): disable the tab-hide/blur/rAF-stall HARD PAUSE so
@@ -368,6 +369,18 @@ export default function TempleDash({ onExit }) {
     event('temple_campaign_start', { from_level: fromIdx + 1 });
     loadLevel(fromIdx);
   }, [loadLevel, refreshProgress]);
+
+  // DEV/QA deep-link: ?level=N jumps straight into trial N (1-based), skipping the
+  // intro — handy for testing one level (e.g. ?level=5 for the Syamantaka Gem grab).
+  // LOCALHOST ONLY: players must never be able to skip levels via URL, so this is
+  // gated on isLocalHost() (localhost / loopback / private-LAN / Vite dev).
+  const deepLinkRef = useRef(false);
+  useEffect(() => {
+    if (deepLinkRef.current || !isLocalHost()) return;
+    let n = 0;
+    try { n = parseInt(new URLSearchParams(window.location.search).get('level') || '', 10); } catch { n = 0; }
+    if (n >= 1 && n <= LEVELS.length) { deepLinkRef.current = true; startCampaign(n - 1); }
+  }, [startCampaign]);
 
   // REWARDED-AD REVIVE (CrazyGames only) — one continue per campaign run. Shown
   // on Game Over. Watching the rewarded video grants a life and retries the
