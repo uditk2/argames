@@ -29,8 +29,18 @@ OUT_DIR = os.path.join(os.path.dirname(__file__), '..', 'public', 'assets', 'tem
 # key -> { en, hi }  (mirrors src/games/temple/narrative.js)
 LINES = {
     'premise': {
-        'en': "Surya, the sun, forged the Syamantaka, a gem that blesses the worthy and buries the rest. For an age it was lost. Last we heard, it lies sealed in this temple. You are a relic hunter, come to take it back, for all of us.",
-        'hi': 'सूर्य ने स्वयं स्यमंतक रत्न गढ़ा, जो योग्य को वरदान देता है, और बाक़ी को दफ़ना देता है। युगों तक यह खोया रहा। आख़िरी बार सुना था, यह इसी मंदिर में बंद है। तुम एक खोजी हो, इसे वापस लाने आए हो, हम सबके लिए।',
+        'en': ("Surya, the sun, forged a jewel of living light: the Syamantaka. "
+               "To the worthy it gave gold without end, and turned away every ruin. The unworthy, it destroyed. "
+               "Kings and brothers fell over it, until Krishna himself fought for the gem and won it. "
+               "But when Dwaraka, his golden city, sank beneath the sea, the Syamantaka was lost to the deep. "
+               "For an age, no one knew where it lay. Then word came: it had been raised from the waters, and sealed in this temple. "
+               "You are a relic hunter. You have come to take it back, not for a throne, but for all of us."),
+        'hi': ('सूर्य ने जीवित प्रकाश का एक रत्न गढ़ा: स्यमंतक। '
+               'योग्य को यह अनंत स्वर्ण देता, और हर विनाश को दूर रखता। अयोग्य को यह नष्ट कर देता। '
+               'राजा और भाई इसके लिए गिरे, जब तक कि स्वयं कृष्ण ने इस रत्न के लिए युद्ध किया और इसे जीता। '
+               'पर जब उनकी स्वर्ण नगरी द्वारका समुद्र में डूबी, स्यमंतक गहराइयों में खो गया। '
+               'युगों तक किसी को न पता था यह कहाँ है। फिर ख़बर आई: इसे जल से निकालकर इसी मंदिर में बंद कर दिया गया। '
+               'तुम एक खोजी हो। इसे वापस लाने आए हो, किसी सिंहासन के लिए नहीं, बल्कि हम सबके लिए।'),
     },
     'goal': {
         'en': 'Read the map. Reach the light before the temple falls.',

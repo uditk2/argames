@@ -737,7 +737,7 @@ export default function TempleDash({ onExit }) {
 
             <div className="px-6 pt-3">
               <p className="text-[13px] italic leading-snug" style={{ color: '#e8c79a' }}>
-                “Surya's Syamantaka Gem — it blesses the worthy and buries the rest. Lost for an age, last heard sealed in this temple. You're the relic hunter come to take it back — for all of us.”
+                “Surya's Syamantaka Gem. Krishna won it; the sea took it with Dwaraka. Now it's sealed in this temple — and you're the relic hunter come to bring it back, for all of us.”
               </p>
               <VOButton k="premise" />
               <CharacterPicker selected={character} onPick={pickCharacter} />
