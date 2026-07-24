@@ -560,7 +560,7 @@ export default function TempleDash({ onExit }) {
           {/* desktop controls hint */}
           {!IS_PHONE && !ended && !reading && (
             <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-[4] text-[12px]" style={{ color: '#d9b98a', textShadow: '0 1px 3px #000' }}>
-              ← → turn · ↑ jump · ↓ duck · hold M for map · beat the clock
+              ← → turn · ↑ jump · ↓ duck · Q turn back · hold M for map
             </div>
           )}
 
