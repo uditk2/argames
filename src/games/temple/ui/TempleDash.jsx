@@ -285,14 +285,12 @@ export default function TempleDash({ onExit }) {
             level: idx + 1, lives_left: after,
           });
           if (after <= 0) event('temple_game_over', { distance: st.distance, clears: st.clears, level: idx + 1 });
-          playVO(after <= 0 ? 'gameover' : 'retry');   // "The temple keeps you." / "Not yet…"
         }
         // CrazyGames: also stop on the edge into 'won' (level clear / escape). The
         // between-levels midgame ad is fired from nextLevel, AFTER this stop.
         if (st.phase === 'won' && lastPhaseRef.current !== 'won') {
           CG.gameplayStop();
           const last = idx >= LEVELS.length - 1;
-          playVO(last ? 'victory' : idx === 4 ? 'grab' : null);   // Syamantaka grab (L5) / final victory (L6)
           // record best time + stars for this level (time left on the clock vs budget).
           const budget = (engRef.current && engRef.current.budgetS) || 0;
           const res = progress.recordClear(idx, st.timeLeft != null ? st.timeLeft : 0, budget);
@@ -346,7 +344,6 @@ export default function TempleDash({ onExit }) {
     if (rt > 0) {
       eng.setReadingHold(true);
       setReading({ secs: rt });
-      playVO(`l${idx + 1}`);   // the temple narrates this trial's line over the study screen
       if (readTimerRef.current) clearInterval(readTimerRef.current);
       let left = rt;
       readTimerRef.current = setInterval(() => {
@@ -734,7 +731,7 @@ export default function TempleDash({ onExit }) {
 
             {/* PLAY — one click to gameplay. */}
             <div className="px-6 py-5 flex flex-col gap-2">
-              <button onClick={() => startCampaign(0)}
+              <button onClick={() => { playVO('premise'); startCampaign(0); }}
                 className="w-full py-3.5 rounded-xl font-black text-white text-lg bg-gradient-to-r from-fire to-magic shadow-glow-fire hover:brightness-110 transition">
                 ▶ {summary.furthest > 0 ? 'New run' : 'Play'}
               </button>
