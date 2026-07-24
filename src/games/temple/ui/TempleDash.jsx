@@ -108,6 +108,10 @@ export default function TempleDash({ onExit }) {
   const [starsByLevel, setStarsByLevel] = useState(() => progress.getStarsByLevel());
   const [summary, setSummary] = useState(() => progress.getSummary());
   const [lastResult, setLastResult] = useState(null);   // { stars, best, isBestTime }
+  // Hold the win panel back so a special beat (the L5 gem lift) can play + be
+  // relished before the panel covers it. Set on the 'won' edge; reset per level.
+  const [showWinPanel, setShowWinPanel] = useState(false);
+  const winPanelTimer = useRef(null);
   // Selected playable hunter (persisted in localStorage; the engine reads it at
   // avatar creation, so choosing on the wizard takes effect on the next run).
   const [character, setCharacterState] = useState(() => getSelectedCharacter().id);
@@ -139,6 +143,7 @@ export default function TempleDash({ onExit }) {
 
   const teardown = useCallback(() => {
     if (cueTimer.current) clearTimeout(cueTimer.current);
+    if (winPanelTimer.current) { clearTimeout(winPanelTimer.current); winPanelTimer.current = null; }
     if (readTimerRef.current) { clearInterval(readTimerRef.current); readTimerRef.current = null; }
     const e = engRef.current; if (e) { try { e.dispose(); } catch {} }
     engRef.current = null;
@@ -239,6 +244,8 @@ export default function TempleDash({ onExit }) {
   const loadLevel = useCallback(async (idx) => {
     teardown();
     setScreen('playing');
+    setShowWinPanel(false);
+    if (winPanelTimer.current) { clearTimeout(winPanelTimer.current); winPanelTimer.current = null; }
     setHud({ distance: 0, clears: 0, phase: 'ready' });
     lastPhaseRef.current = 'ready';           // fresh level → next 'over' edge counts
     pausedRef.current = false; setPaused(false);   // a fresh level never starts paused
@@ -301,6 +308,12 @@ export default function TempleDash({ onExit }) {
           if (last) progress.recordVictory();
           setLastResult(res);
           refreshProgress();
+          // Hold the panel: on L5 let the Syamantaka Gem lift play out (relish it),
+          // a short settle elsewhere. isArtifact = the gem level (index 4).
+          const isArtifact = idx === 4;
+          if (winPanelTimer.current) clearTimeout(winPanelTimer.current);
+          setShowWinPanel(false);
+          winPanelTimer.current = setTimeout(() => setShowWinPanel(true), isArtifact ? 2600 : 350);
           event(last ? 'temple_campaign_complete' : 'temple_level_complete', {
             level: idx + 1, distance: st.distance, clears: st.clears, lives_left: livesRef.current,
             stars: res.stars, best_time: res.best,
@@ -692,7 +705,7 @@ export default function TempleDash({ onExit }) {
           ))}
 
           {/* WIN overlay — level complete (not last) or full victory (last) */}
-          {won && (isLastLevel ? (
+          {won && showWinPanel && (isLastLevel ? (
             <VictoryPanel
               distance={hud.distance}
               clears={hud.clears}
@@ -706,6 +719,7 @@ export default function TempleDash({ onExit }) {
               levelName={levelName}
               lives={lives}
               result={lastResult}
+              artifact={levelIndex === 4}
               onNext={nextLevel}
               onExit={onExit ? backToMenu : null}
             />
@@ -955,13 +969,13 @@ function GameOverPanel({ distance, clears, canRevive, reviving, onRevive, onRest
 }
 
 // WIN on a non-last level — gold/green LEVEL COMPLETE, advances keeping lives.
-function LevelCompletePanel({ levelName, lives, result, onNext, onExit }) {
+function LevelCompletePanel({ levelName, lives, result, artifact, onNext, onExit }) {
   return (
-    <Overlay bg="rgba(10,12,7,0.82)" border="#9be7a055">
-      <div className="font-display font-black text-3xl" style={{ color: '#ffb454', textShadow: '0 2px 16px #000, 0 0 26px #9be7a066' }}>
-        LEVEL COMPLETE
+    <Overlay bg="rgba(10,12,7,0.82)" border={artifact ? '#ffd45a66' : '#9be7a055'}>
+      <div className="font-display font-black text-3xl" style={{ color: '#ffd45a', textShadow: '0 2px 16px #000, 0 0 26px #ffd45a55' }}>
+        {artifact ? 'THE GEM IS YOURS' : 'LEVEL COMPLETE'}
       </div>
-      <div className="mt-1 text-[13px]" style={{ color: '#9be7a0' }}>{levelName} escaped</div>
+      <div className="mt-1 text-[13px]" style={{ color: '#ffd99a' }}>{artifact ? 'The Syamantaka Gem — now run for daylight' : `${levelName} escaped`}</div>
       {result && (
         <div className="mt-3 flex flex-col items-center gap-1">
           <Stars n={result.stars} size={22} />
