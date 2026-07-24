@@ -121,6 +121,23 @@ export function createGridNav(maze, { speed = 6, cellW = 10 } = {}) {
     return true;
   }
 
+  // Is there any turn (a side passage) ahead in this corridor before it walls off?
+  // Walks forward from the current cell along `heading`; true if any cell has an
+  // opening that isn't straight-ahead or straight-back. Used to decide whether a
+  // ←/→ press should wait for a junction, or (if the way ahead is a dead-end stub)
+  // just turn the runner around so it's not forced to run to the wall and back.
+  function branchAhead() {
+    let cr = r, cc = c, guard = 0;
+    while (guard++ < 64) {
+      for (const d of openings(cr, cc)) if (d !== heading && d !== BACK[heading]) return true;
+      if (!openDir(cr, cc, heading)) return false;      // walled off ahead, no branch
+      const [dr, dc] = DELTA[heading];
+      if (!inb(cr + dr, cc + dc)) return false;
+      cr += dr; cc += dc;
+    }
+    return false;
+  }
+
   function worldPos() {
     const [dr, dc] = DELTA[heading];
     const cr = r + dr * t, cc = c + dc * t;      // interpolate toward the next cell
@@ -135,7 +152,7 @@ export function createGridNav(maze, { speed = 6, cellW = 10 } = {}) {
 
   reset();
   return {
-    reset, update, turn, turnAround, worldPos, openings, isDeadEnd, isJunction,
+    reset, update, turn, turnAround, branchAhead, worldPos, openings, isDeadEnd, isJunction,
     headingVec: () => HVEC[heading],
     get cell() { return { r, c }; },
     get heading() { return heading; },

@@ -151,10 +151,14 @@ export default function TempleDash({ onExit }) {
   useEffect(() => teardown, [teardown]);
 
   const flashCue = useCallback((text, color) => {
+    // '__uturn__' is the engine's "you're heading the wrong way, turn back" signal —
+    // shown longer and worded for the device (Q keycap on desktop, ↩ on mobile).
+    const uturn = text === '__uturn__';
+    const shown = uturn ? (IS_PHONE ? '↩  Turn back' : 'Q  ↺  Turn back') : text;
     const id = Math.random();
-    setCue({ text, color: color || '#ffd99a', id });
+    setCue({ text: shown, color: color || '#ffd99a', id, small: uturn });
     if (cueTimer.current) clearTimeout(cueTimer.current);
-    cueTimer.current = setTimeout(() => setCue((c) => (c && c.id === id ? null : c)), 650);
+    cueTimer.current = setTimeout(() => setCue((c) => (c && c.id === id ? null : c)), uturn ? 1600 : 650);
   }, []);
 
   const sendInput = useCallback((action) => {
@@ -551,8 +555,8 @@ export default function TempleDash({ onExit }) {
 
           {/* transient cue */}
           {cue && (
-            <div key={cue.id} className="absolute left-1/2 top-[44%] -translate-x-1/2 -translate-y-1/2 z-[6] pointer-events-none font-black"
-              style={{ fontSize: IS_PHONE ? 44 : 64, color: cue.color, letterSpacing: '0.05em', textShadow: '0 2px 10px #000, 0 0 24px #ffae4a', animation: 'temple-cue 650ms ease-out forwards' }}>
+            <div key={cue.id} className="absolute left-1/2 top-[44%] -translate-x-1/2 -translate-y-1/2 z-[6] pointer-events-none font-black text-center"
+              style={{ fontSize: cue.small ? (IS_PHONE ? 22 : 30) : (IS_PHONE ? 44 : 64), color: cue.color, letterSpacing: '0.05em', textShadow: '0 2px 10px #000, 0 0 24px #ffae4a', animation: cue.small ? 'none' : 'temple-cue 650ms ease-out forwards' }}>
               {cue.text}
             </div>
           )}

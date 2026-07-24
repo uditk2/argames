@@ -377,6 +377,10 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
       // A fresh tap overwrites the buffer, so you can change your mind.
       pendTurn = action; pendAt = performance.now();
       tryTurn();
+      // If it couldn't turn AND the way ahead is a dead-end stub (no junction before
+      // the wall), the player is heading the wrong way — prompt the U-turn control so
+      // they learn how to turn back (the UI styles this into a Q keycap / ↩ hint).
+      if (pendTurn && !nav.branchAhead()) { pendTurn = null; cue('__uturn__', '#ffd99a'); }
     } else if (action === 'uturn') {
       // mid-corridor about-face (keyboard Q / on-screen button)
       const before = nav.heading;
