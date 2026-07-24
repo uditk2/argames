@@ -36,6 +36,7 @@ import { createGridHazards } from './gridHazards.js';
 import { createAvatarActor } from './avatarActor.js';
 import { createStoneDoor } from './stoneDoor.js';
 import { createRelicProp } from './relicProp.js';
+import { createBoulderChase } from './boulderChase.js';
 import { drawMinimap } from './minimap.js';
 import { createCollapse } from './collapse.js';
 import { createBoulderFx } from './boulderFx.js';
@@ -220,6 +221,13 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     carryGlow = new THREE.PointLight(0xffd24a, 2.0, CELL * 2.2, 2.0);
     scene.add(carryGlow);
   }
+  // L6 ESCAPE: a boulder rolls the solution route behind you (one-time chase).
+  const CHASE = !!mp.chase;
+  const CRUSH_R = mp.crushRadius || CELL * 0.55;
+  const boulder = CHASE ? createBoulderChase({
+    THREE, scene, path, cellW: CELL, H, speed: mp.boulderSpeed || SPD * 1.12, startBehind: 2.6,
+  }) : null;
+  let boulderStarted = false;
   // STONE DOOR (L1-L4): a slab just past the exit cell's centre, lowering with the timer.
   const door = ENDING === 'door' ? createStoneDoor({
     THREE, scene, W: CELL, H,
@@ -250,6 +258,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
   const DUCK_WINDOW = 480;                     // ms a duck press counts as "ducking" at the door
   let hop = 0, dip = 0, hopV = 0, dipV = 0;
   let sealShake = 0;   // decaying camera-shake pulse fired when the wall slams shut behind you
+  let boulderShake = 0;   // camera rumble scaled by how close the chasing boulder is
   const hitDeadEnds = new Set();
   let mmCanvas = minimapCanvas || null, mx = mmCanvas ? mmCanvas.getContext('2d') : null;
   // smoothed rig (heading + position) so turns/pivots swing instead of snapping
@@ -272,12 +281,14 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     world.retarget(nav.cell.r, nav.cell.c, nav.heading, true);   // re-anchor the entry projection
     if (door) door.reset();
     if (sealWall) sealWall.reset();
+    if (boulder) boulder.reset();
+    boulderStarted = false;
     if (relic) { relic.reset(); setRelicTaken(false); }   // retrying L5 un-takes the gem
     hitDeadEnds.clear();
     phase = 'run'; collapseArmed = false; runT = 0; runDist = 0; clears = 0;
     deathCause = null; winT = 0; stuckT = 0; sliceT = 0; stuckWarned = false; stuckAction = 'jump';
     falling = false; fallT = 0; duckUntil = -1; doorCued = false;
-    hop = 0; dip = 0; hopV = 0; dipV = 0; sealShake = 0; teachAction = null; teachT = 0; teachCueAcc = 0;
+    hop = 0; dip = 0; hopV = 0; dipV = 0; sealShake = 0; boulderShake = 0; teachAction = null; teachT = 0; teachCueAcc = 0;
     const hv = nav.headingVec(); camFwd.x = hv.x; camFwd.z = hv.z;
     rigInit = false;
     audio.ambient(false);
@@ -467,6 +478,23 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     if (!collapseArmed && !readingHold && phase === 'run' && !falling
         && (runT >= GRACE_S || (RUN2MOVE && runHeld))) {
       collapseArmed = true; collapse.arm(); audio.ambient(true);
+      // L6: the wall bursts and the boulder gives chase the moment the run begins.
+      if (boulder && !boulderStarted) { boulderStarted = true; boulder.start(); audio.collapse ? audio.collapse() : audio.die('collapse'); cue('RUN!', '#ff2e22'); }
+    }
+    // ---- boulder chase: roll it, rumble as it nears, crush on contact ------------
+    if (boulder) {
+      const bp = boulder.update(phase === 'run' ? dt : 0, phase === 'run');
+      if (phase === 'run' && !boulder.gone) {
+        const pp = nav.worldPos();
+        const d = Math.hypot(bp.x - pp.x, bp.z - pp.z);
+        if (d < CRUSH_R) { die('crush', 'CRUSHED!', '#ff2e22'); }
+        else {
+          // proximity rumble: the closer + more behind you, the harder the shake.
+          const near = Math.max(0, 1 - d / (CELL * 3));
+          boulderShake = Math.max(boulderShake, near * near);
+          audio.danger(Math.max(collapseArmed ? 1 - collapse.remaining() / Math.max(1, BUDGET_S) : 0, near));
+        }
+      }
     }
     {
       const ticking = (phase === 'run' && !falling) || phase === 'stuck';
@@ -590,6 +618,13 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
       cam.position.y += Math.cos(tnow * 73.0) * scs;
       sealShake = Math.max(0, sealShake - dt * 2.6);
     }
+    // boulder rumble: sustained shake that grows as the stone bears down on you.
+    if (boulderShake > 0.001) {
+      const bcs = (COLLAPSE.camShake || 0.4) * 1.3 * boulderShake;
+      cam.position.x += Math.sin(tnow * 57.0) * bcs;
+      cam.position.y += Math.cos(tnow * 63.0) * bcs;
+      boulderShake = Math.max(0, boulderShake - dt * 3.0);   // re-set each frame from proximity
+    }
 
     // ---- avatar -------------------------------------------------------------------
     avatar.update(dt, {
@@ -634,6 +669,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     try { avatar.dispose(); } catch { /* gone */ }
     try { props.dispose(); } catch { /* gone */ }
     try { if (relic) relic.dispose(); } catch { /* gone */ }
+    try { if (boulder) boulder.dispose(); } catch { /* gone */ }
     try { world.dispose(); } catch { /* gone */ }
     try {
       scene.traverse((obj) => {

@@ -238,7 +238,7 @@ export const LEVEL_MAZE = [
   { cols: 5, rows: 5, braid: 0.50, runSpeed: 10, routePct: 0.27, slack: 0.45, cellLen: 21, readTime: 4, grace: 5, ending: 'door',     hazards: ['blade', 'beam', 'crack'] },         // L3 — adds JUMP (beams + cracked floor); duck retained
   { cols: 6, rows: 5, braid: 0.52, runSpeed: 11, routePct: 0.22, slack: 0.42, cellLen: 21, readTime: 4, grace: 4, ending: 'door',     hazards: ['beam', 'blade', 'crack', 'fire'] },// L4
   { cols: 6, rows: 6, braid: 0.55, runSpeed: 11, routePct: 0.17, slack: 0.38, cellLen: 20, readTime: 4, grace: 4, ending: 'artifact', hazards: ['beam', 'blade', 'crack', 'fire'] },// L5 (artifact)
-  { cols: 7, rows: 6, braid: 0.58, runSpeed: 13, routePct: 0.12, slack: 0.35, cellLen: 20, readTime: 3, grace: 3, ending: 'exit',     hazards: ['beam', 'blade', 'crack', 'fire'] },// L6 (escape)
+  { cols: 7, rows: 6, braid: 0.25, runSpeed: 12, routePct: 0.16, slack: 0.40, cellLen: 20, readTime: 3, grace: 3, ending: 'exit',     hazards: ['crack', 'beam'] },// L6 (escape) — boulder chase: clear main route + dead-end ducking spots, crack/beam jumps
 ];
 
 // ---- adapter: grid maze -> engine route -----------------------------------
@@ -373,7 +373,7 @@ export function buildEngineMap(levelIndex, seedOverride) {
   const L = generateTempleLevel(levelIndex, seedOverride);
   const cfg = L.cfg;
   const junctions = mazeToJunctions(L.path, { cellLen: cfg.cellLen, hazards: cfg.hazards, seed: L.seed });
-  return {
+  const map = {
     mode: 'maze',
     ending: cfg.ending,
     params: {
@@ -390,6 +390,15 @@ export function buildEngineMap(levelIndex, seedOverride) {
     }),
     _meta: { seed: L.seed, routes: L.pacing.routes, stats: L.stats },
   };
+  // L6 ESCAPE: a boulder chases along the solution path. It's still a maze (with
+  // cracked-floor jumps + dead ends), but the dead ends are now your safe ducking
+  // spots — stay in the open route too long and the boulder crushes you.
+  if (levelIndex === 5) {
+    map.params.chase = true;
+    map.params.boulderSpeed = cfg.runSpeed * 1.12;   // a touch faster than the runner
+    map.params.crushRadius = 7.5;
+  }
+  return map;
 }
 
 // Build everything for a level: the maze (Kruskal + braid for multiple routes),
