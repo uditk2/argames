@@ -276,6 +276,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
   let hop = 0, dip = 0, hopV = 0, dipV = 0;
   let sealShake = 0;   // decaying camera-shake pulse fired when the wall slams shut behind you
   let boulderShake = 0;   // camera rumble scaled by how close the chasing boulder is
+  let audioEnded = false;   // one-shot: music/rumble killed when the run ends
   const hitDeadEnds = new Set();
   let mmCanvas = minimapCanvas || null, mx = mmCanvas ? mmCanvas.getContext('2d') : null;
   // smoothed rig (heading + position) so turns/pivots swing instead of snapping
@@ -305,7 +306,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     phase = 'run'; collapseArmed = false; runT = 0; runDist = 0; clears = 0;
     deathCause = null; winT = 0; stuckT = 0; sliceT = 0; stuckWarned = false; stuckAction = 'jump';
     falling = false; fallT = 0; duckUntil = -1; doorCued = false;
-    hop = 0; dip = 0; hopV = 0; dipV = 0; sealShake = 0; boulderShake = 0; teachAction = null; teachT = 0; teachCueAcc = 0;
+    hop = 0; dip = 0; hopV = 0; dipV = 0; sealShake = 0; boulderShake = 0; audioEnded = false; teachAction = null; teachT = 0; teachCueAcc = 0;
     const hv = nav.headingVec(); camFwd.x = hv.x; camFwd.z = hv.z;
     rigInit = false;
     audio.ambient(false);
@@ -533,13 +534,19 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     }
     // L5 chamber wall seals after the grab (same impact beat).
     if (sealWall && sealWall.sealing && sealWall.tickSeal(dt)) { sealShake = 1; audio.seal(); }
-    audio.danger(Math.max(0, Math.min(1, 1 - collapse.remaining() / Math.max(1, BUDGET_S))));
+    // Music/rumble only while actively playing; the moment the run ENDS (any death
+    // path, incl. the pit — which sets 'over' directly — or a win) kill the bed once.
+    if (phase === 'run' || phase === 'stuck') {
+      audio.danger(Math.max(0, Math.min(1, 1 - collapse.remaining() / Math.max(1, BUDGET_S))));
+    } else if (!audioEnded && (phase === 'over' || phase === 'won')) {
+      audioEnded = true; audio.ambient(false);
+    }
 
     // ---- movement / hazards / exit ----------------------------------------------
     let moving = false;
     if (phase === 'run' && falling) {
       fallT += dt;
-      if (fallT >= FALL.dur) { phase = 'over'; deathCause = 'pit'; pushState(); }
+      if (fallT >= FALL.dur) { phase = 'over'; deathCause = 'pit'; audio.ambient(false); pushState(); }
     } else if (phase === 'run') {
       const moveOK = (!RUN2MOVE || runHeld) && !readingHold;
       if (moveOK) runT += dt;
