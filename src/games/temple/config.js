@@ -151,7 +151,7 @@ export const CAM = {
 
 // Avatar billboard (camera-facing sprite plane).
 export const AVATAR = {
-  height: 2.6,        // world height of the sprite plane (smaller so the chasing boulder fits behind)
+  height: 3.1,        // world height of the sprite plane (bigger + more present in the hall)
   aspect: 0.62,       // width/height of the keyed sprite art
   yOffset: 0.0,       // lift off the floor so feet sit on the ground
   runFps: 22,         // run-cycle frame rate

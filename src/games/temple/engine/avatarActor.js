@@ -33,6 +33,28 @@ export function createAvatarActor({ THREE, scene, ALIGN = { avatarScale: 1, avat
   mesh.scale.setScalar(ALIGN.avatarScale);
   scene.add(mesh);
 
+  // ---- soft contact shadow: a radial-gradient blob on the floor under the runner.
+  // Grounds the flat billboard so it reads as placed IN the hall (3D), and shrinks
+  // + fades as the runner leaves the ground on a jump.
+  const shadow = (() => {
+    const cv = (typeof document !== 'undefined') ? document.createElement('canvas') : null;
+    let tex = null;
+    if (cv) {
+      cv.width = cv.height = 64;
+      const g = cv.getContext('2d');
+      const rg = g.createRadialGradient(32, 32, 2, 32, 32, 30);
+      rg.addColorStop(0, 'rgba(0,0,0,0.62)'); rg.addColorStop(0.7, 'rgba(0,0,0,0.28)'); rg.addColorStop(1, 'rgba(0,0,0,0)');
+      g.fillStyle = rg; g.fillRect(0, 0, 64, 64);
+      tex = new THREE.CanvasTexture(cv);
+    }
+    const smat = new THREE.MeshBasicMaterial({ map: tex, color: 0x000000, transparent: true, opacity: 0.5, depthWrite: false });
+    const shW = AVATAR.height * AVATAR.aspect * 1.35 * ALIGN.avatarScale;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(shW, shW * 0.58), smat);
+    m.rotation.x = -Math.PI / 2; m.position.y = 0.05; m.renderOrder = 4;
+    scene.add(m);
+    return { mesh: m, mat: smat, tex };
+  })();
+
   let anim = 'run', animT = 0, animFrame = 0, runT = 0;
 
   function setAnim(name) { anim = name; animT = 0; animFrame = 0; }
@@ -40,6 +62,7 @@ export function createAvatarActor({ THREE, scene, ALIGN = { avatarScale: 1, avat
     setAnim('run'); runT = 0;
     mat.opacity = 1;
     mesh.scale.setScalar(ALIGN.avatarScale);
+    shadow.mat.opacity = 0.5; shadow.mesh.scale.set(1, 1, 1);
   }
 
   function update(dt, { pos, camQuat, moving, phase, deathCause, fallY = 0, fallP = 0, winT = 0, stuckT = 0, sliceT = 0 }) {
@@ -63,6 +86,13 @@ export function createAvatarActor({ THREE, scene, ALIGN = { avatarScale: 1, avat
     const footY = AVATAR.yOffset + (AVATAR.height * ALIGN.avatarScale) / 2 + ALIGN.avatarLift;
     mesh.position.set(pos.x, footY + lift - drop, pos.z);
     mesh.quaternion.copy(camQuat);   // billboard: face the (un-rolled) camera
+
+    // contact shadow: stays on the floor under the runner; shrinks + softens as
+    // they leave the ground on a jump (sells the height), stronger on a duck.
+    const air = Math.max(0, lift);
+    shadow.mesh.position.set(pos.x, 0.05, pos.z);
+    const ss = Math.max(0.5, 1 - air * 0.14) * (1 + drop * 0.05);
+    shadow.mesh.scale.set(ss, ss, 1);
 
     // ---- failure / ending FX (transforms on the sprite, no bespoke clips) -----
     const falling = fallP > 0;
@@ -90,10 +120,13 @@ export function createAvatarActor({ THREE, scene, ALIGN = { avatarScale: 1, avat
     } else {
       mat.opacity = 1;
     }
+    // shadow fades with the runner (death dissolve / jump air) so they leave together.
+    shadow.mat.opacity = mat.opacity * 0.5 * Math.max(0.35, 1 - Math.max(0, lift) * 0.1);
   }
 
   function dispose() {
     try { scene.remove(mesh); geo.dispose(); mat.dispose(); } catch { /* gone */ }
+    try { scene.remove(shadow.mesh); shadow.mesh.geometry.dispose(); shadow.mat.dispose(); if (shadow.tex) shadow.tex.dispose(); } catch { /* gone */ }
     Object.values(sprite).forEach((sh) => sh.frames.forEach((t) => { try { t.dispose(); } catch { /* gone */ } }));
   }
 
