@@ -238,10 +238,13 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     return cells;
   };
   const boulder = CHASE ? createBoulderChase({
-    THREE, scene, path: straightRun(maze.entrance, nav.heading), cellW: CELL, H,
+    path: straightRun(maze.entrance, nav.heading), cellW: CELL,
     speed: mp.boulderSpeed || SPD * 1.06, startBehind: 4.5,   // gentler + more head start (fair)
   }) : null;
-  let boulderStarted = false;
+  // the ornate boulder is drawn as a 2D overlay peeking up from behind (a 3D sphere
+  // would sit behind the forward-facing camera). Loaded once here.
+  const boulderImg = CHASE ? (() => { const im = new Image(); im.src = ASSETS.boulder; return im; })() : null;
+  let boulderStarted = false, boulderRoll = 0;
   // STONE DOOR (L1-L4): a slab just past the exit cell's centre, lowering with the timer.
   const door = ENDING === 'door' ? createStoneDoor({
     THREE, scene, W: CELL, H,
@@ -498,6 +501,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     // ---- boulder chase: roll it, rumble as it nears, crush on contact ------------
     if (boulder) {
       const bp = boulder.update(phase === 'run' ? dt : 0, phase === 'run');
+      if (phase === 'run' && boulderStarted && !boulder.gone) boulderRoll += dt * 2.6;   // spin the overlay
       if (boulder.takeCrash()) { boulderShake = 1; audio.seal(); cue('IT CRASHED!', '#ffd99a'); }   // slams into the wall it can't turn past
       if (phase === 'run' && !boulder.gone) {
         const pp = nav.worldPos();
@@ -663,6 +667,26 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
       atExit: dE <= EXIT.ramp,
     }, dt);
     collapse.drawCollapse(fc, fxCanvas, dt);
+
+    // ---- BOULDER OVERLAY: the ornate stone peeks up from behind and GROWS as it
+    // closes in, engulfing the screen at the crush. A sliver is always visible while
+    // it's on your tail; it recedes once you turn off its line (distance grows).
+    if (boulder && boulderImg && fc && boulderStarted && !boulder.gone && boulderImg.complete && boulderImg.naturalWidth) {
+      const ppb = nav.worldPos(), bpb = boulder.worldPos();
+      const dist = Math.hypot(bpb.x - ppb.x, bpb.z - ppb.z);
+      const p = Math.max(0, Math.min(1.15, 1 - dist / (CELL * 5)));   // >1 near contact -> engulf
+      if (p > 0.02) {
+        const W2 = fxCanvas.width, H2 = fxCanvas.height;
+        const size = H2 * (0.62 + p * 2.1);
+        const cyp = H2 * (1.22 - p * 0.74);   // rises from below the bottom as it nears
+        fc.save();
+        fc.translate(W2 / 2, cyp);
+        fc.rotate(boulderRoll);
+        fc.globalAlpha = Math.min(1, 0.72 + p * 0.6);
+        fc.drawImage(boulderImg, -size / 2, -size / 2, size, size);
+        fc.restore();
+      }
+    }
 
     pushState();
     raf = requestAnimationFrame(animate);
