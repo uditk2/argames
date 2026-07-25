@@ -708,8 +708,8 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
   }
   function start() { if (running) return; resize(); resetGame(); running = true; last = performance.now(); raf = requestAnimationFrame(animate); }
   function stop() { running = false; if (raf) cancelAnimationFrame(raf); raf = 0; }
-  function pauseLoop() { if (!running) return; running = false; if (raf) cancelAnimationFrame(raf); raf = 0; }
-  function resumeLoop() { if (running) return; running = true; last = performance.now(); raf = requestAnimationFrame(animate); }
+  function pauseLoop() { if (!running) return; running = false; if (raf) cancelAnimationFrame(raf); raf = 0; audio.suspend(); }
+  function resumeLoop() { if (running) return; audio.resume(); running = true; last = performance.now(); raf = requestAnimationFrame(animate); }
   function dispose() {
     stop();
     try { avatar.dispose(); } catch { /* gone */ }

@@ -46,6 +46,9 @@ export function createAudio() {
     return ctx;
   }
   function resume() { const c = ensure(); if (c && c.state === 'suspended') c.resume(); }
+  // Pause ALL audio (music, rumble, sfx) by suspending the context — used when the
+  // game hard-pauses (tab hide / blur / Pause screen). resume() picks it back up.
+  function suspend() { if (ctx && ctx.state === 'running') { try { ctx.suspend(); } catch { /* noop */ } } }
 
   async function loadSamples() {
     if (loadStarted || !ctx) return; loadStarted = true;
@@ -170,7 +173,7 @@ export function createAudio() {
   function toggleMuted() { return setMuted(!muted); }
 
   return {
-    resume, jump, duck, turn, back, stumble, clear, pickup, win, lose, die, doorGrind, seal,
+    resume, suspend, jump, duck, turn, back, stumble, clear, pickup, win, lose, die, doorGrind, seal,
     ambient, danger, tickFeet, setMuted, toggleMuted, get muted() { return muted; },
   };
 }
