@@ -422,7 +422,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
   // buffer carries an early press across cells and fires at the FIRST opening it finds —
   // often an earlier junction than you meant (a "wrong turn"). Keeping it short means the
   // press only lands at the junction you're actually approaching; press again if you're early.
-  const TURN_AT_T = 0.42;        // don't turn until the runner is past the junction cell's
+  const TURN_AT_T = 0.62;        // don't turn until the runner is past the junction cell's
   // centre — turning the instant you cross into the cell (t≈0) cuts the near corner and
   // reads as "turning early". At a wall/corner we must turn immediately (no through-path).
   function tryTurn() {

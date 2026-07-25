@@ -865,13 +865,31 @@ function CollapseTimer({ timeLeft, urgent, armed }) {
   );
 }
 
-// Lives shown as mini-hunter tokens: three little back-view portraits of the
-// chosen hunter in a gold ring. A remaining life is warm + glowing; a lost one
-// greys out, and the token that JUST died shatters (temple-life-lost keyframe) so
-// a lost life is felt, not silently swapped.
+// Lives shown as faceted GEM tokens (Syamantaka shards) — a clean brilliant-cut
+// diamond that stays crisp at any size (the old mini-photo tokens turned to mud at
+// 26px). A remaining life glows gold; a spent one is a hollow dark outline; the one
+// that JUST died shatters (temple-life-lost keyframe) so a lost life is felt.
+function GemToken({ alive }) {
+  const crown = alive ? '#ffd873' : 'transparent';
+  const pav = alive ? '#e0a636' : 'transparent';
+  const line = alive ? 'rgba(255,246,208,0.75)' : 'rgba(150,130,95,0.5)';
+  const edge = alive ? '#fff2c0' : '#6b5a3e';
+  return (
+    <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"
+      style={{ display: 'block', filter: alive ? 'drop-shadow(0 0 5px rgba(255,190,70,0.7))' : 'none', opacity: alive ? 1 : 0.6 }}>
+      <polygon points="6,4 18,4 22,9.5 2,9.5" fill={crown} />
+      <polygon points="2,9.5 22,9.5 12,22" fill={pav} />
+      <g stroke={line} strokeWidth="0.8" fill="none" strokeLinejoin="round">
+        <line x1="2" y1="9.5" x2="22" y2="9.5" />
+        <line x1="6" y1="4" x2="12" y2="9.5" /><line x1="18" y1="4" x2="12" y2="9.5" />
+        <line x1="12" y1="9.5" x2="12" y2="22" />
+        <line x1="2" y1="9.5" x2="12" y2="22" /><line x1="22" y1="9.5" x2="12" y2="22" />
+      </g>
+      <polygon points="6,4 18,4 22,9.5 12,22 2,9.5" fill="none" stroke={edge} strokeWidth="1.1" strokeLinejoin="round" />
+    </svg>
+  );
+}
 function LivesRow({ lives }) {
-  const id = getSelectedCharacter().id;
-  const src = assetUrl(`assets/temple/char/${id}/run/r_00.webp`);
   const prev = useRef(lives);
   const justLost = lives < prev.current ? lives : -1;
   useEffect(() => { prev.current = lives; }, [lives]);
@@ -882,16 +900,8 @@ function LivesRow({ lives }) {
         const lostNow = i === justLost;
         return (
           <div key={lostNow ? `lost-${lives}-${i}` : i}
-            className={`relative rounded-full overflow-hidden select-none${lostNow ? ' temple-life-lost' : ''}`}
-            style={{
-              width: 26, height: 26,
-              border: `2px solid ${alive ? '#ffd45a' : '#5a4a34'}`,
-              background: 'radial-gradient(circle at 50% 35%, #3a2a16, #0e0805)',
-              boxShadow: alive ? '0 0 9px rgba(255,180,60,0.55)' : 'none',
-              opacity: alive ? 1 : 0.55,
-            }}>
-            <img src={src} alt={alive ? 'life' : 'lost'} draggable={false}
-              style={{ position: 'absolute', left: '50%', top: '14%', transform: 'translateX(-50%)', height: '150%', width: 'auto', objectFit: 'contain', filter: alive ? 'brightness(1.05) saturate(1.05)' : 'grayscale(1) brightness(0.55)' }} />
+            className={`relative select-none${lostNow ? ' temple-life-lost' : ''}`}>
+            <GemToken alive={alive} />
           </div>
         );
       })}
