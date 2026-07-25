@@ -418,10 +418,19 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
   }
 
   // buffered-turn state + resolver (see the left/right branch above)
-  const TURN_BUFFER_MS = 1800;   // hold a ←/→ tap this long so an early press still lands at the junction
+  const TURN_BUFFER_MS = 700;    // hold a ←/→ tap this long. SHORT on purpose: a long
+  // buffer carries an early press across cells and fires at the FIRST opening it finds —
+  // often an earlier junction than you meant (a "wrong turn"). Keeping it short means the
+  // press only lands at the junction you're actually approaching; press again if you're early.
+  const TURN_AT_T = 0.42;        // don't turn until the runner is past the junction cell's
+  // centre — turning the instant you cross into the cell (t≈0) cuts the near corner and
+  // reads as "turning early". At a wall/corner we must turn immediately (no through-path).
   function tryTurn() {
     if (!pendTurn || phase !== 'run') { if (phase !== 'run') pendTurn = null; return; }
     if (performance.now() - pendAt > TURN_BUFFER_MS) { pendTurn = null; return; }
+    // Wait for the runner to reach the junction centre before pivoting (unless stopped at
+    // a wall). This keeps the buffered press alive and retries next frame.
+    if (!nav.atWall && nav.t < TURN_AT_T) return;
     const cell = nav.cell, wasWall = nav.atWall, before = nav.heading;
     const choice = nav.openings(cell.r, cell.c).length >= 3;   // a REAL decision point
     if (nav.turn(pendTurn === 'left' ? 'L' : 'R')) {
