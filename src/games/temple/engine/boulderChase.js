@@ -24,17 +24,23 @@ export function createBoulderChase({ THREE, scene, path = [], cellW = 14, H = 7,
   const seg = [], cum = [0];
   for (let i = 1; i < pts.length; i++) { const d = pts[i].distanceTo(pts[i - 1]); seg.push(d); cum.push(cum[i - 1] + d); }
   const total = cum[cum.length - 1];
-  const R = cellW * 0.52;                     // nearly fills the corridor — menacing
+  // Fit the HALL HEIGHT (the limiting dimension — the hall is wide but short), so
+  // the sphere doesn't punch through the ceiling and read as a dark dome.
+  const R = Math.min(cellW * 0.5, H * 0.42);
 
-  // rocky stone sphere (seamless wall texture, dark warm stone).
+  // rocky stone sphere (seamless wall texture, warm stone). Brightened + self-lit a
+  // little so it reads clearly in the unlit TIP corridor instead of a black blob.
   const texLoader = new THREE.TextureLoader();
   const tex = texLoader.load(ASSETS.texWall);
-  tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(3, 2);
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping; tex.repeat.set(2, 1);
   if ('colorSpace' in tex) tex.colorSpace = THREE.SRGBColorSpace;
-  const mat = new THREE.MeshStandardMaterial({ map: tex, color: 0x7a6650, roughness: 1.0, metalness: 0.0, emissive: 0x1a1108, emissiveIntensity: 0.4 });
+  const mat = new THREE.MeshStandardMaterial({ map: tex, color: 0xb39472, roughness: 0.95, metalness: 0.0, emissive: 0x5a3c1e, emissiveIntensity: 0.9 });
   const mesh = new THREE.Mesh(new THREE.SphereGeometry(R, 28, 20), mat);
   mesh.renderOrder = 2;
   scene.add(mesh);
+  // a warm light travelling with the boulder so it (and the walls around it) read.
+  const bLight = new THREE.PointLight(0xffb060, 1.6, R * 6, 2.0);
+  scene.add(bLight);
 
   const startArc = -Math.abs(startBehind) * cellW;
   let arc = startArc, rolling = false, rollAngle = 0, gone = false, crashT = -1, crashFired = false;
@@ -56,7 +62,8 @@ export function createBoulderChase({ THREE, scene, path = [], cellW = 14, H = 7,
     if (crashT >= 0) { crashT += dt; if (crashT > 1.1) { gone = true; mesh.visible = false; } }
     const p = posAt(arc);
     const bob = crashT >= 0 ? Math.max(0, 1 - crashT * 3) * R * 0.15 * Math.sin(crashT * 40) : 0;  // shudder on impact
-    mesh.position.set(p.x, R * 0.9 + bob, p.z);
+    mesh.position.set(p.x, R + bob, p.z);
+    bLight.position.set(p.x, R * 1.6, p.z); bLight.visible = !gone;
     const ahead = posAt(arc + 0.1), dir = new THREE.Vector3().subVectors(ahead, p);
     dir.y = 0; if (dir.lengthSq() > 1e-6) dir.normalize(); else dir.set(0, 0, 1);
     const axis = new THREE.Vector3(dir.z, 0, -dir.x);
@@ -76,7 +83,7 @@ export function createBoulderChase({ THREE, scene, path = [], cellW = 14, H = 7,
     get total() { return total; },
     get R() { return R; },
     get gone() { return gone; },
-    dispose() { try { scene.remove(mesh); mesh.geometry.dispose(); mat.dispose(); if (tex.dispose) tex.dispose(); } catch { /* gone */ } },
+    dispose() { try { scene.remove(mesh); scene.remove(bLight); mesh.geometry.dispose(); mat.dispose(); if (tex.dispose) tex.dispose(); } catch { /* gone */ } },
   };
 }
 

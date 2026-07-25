@@ -395,8 +395,8 @@ export function buildEngineMap(levelIndex, seedOverride) {
   // spots — stay in the open route too long and the boulder crushes you.
   if (levelIndex === 5) {
     map.params.chase = true;
-    map.params.boulderSpeed = cfg.runSpeed * 1.12;   // a touch faster than the runner
-    map.params.crushRadius = 7.5;
+    map.params.boulderSpeed = cfg.runSpeed * 1.06;   // a touch faster than the runner (fair)
+    map.params.crushRadius = 6.5;
   }
   return map;
 }

@@ -239,7 +239,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
   };
   const boulder = CHASE ? createBoulderChase({
     THREE, scene, path: straightRun(maze.entrance, nav.heading), cellW: CELL, H,
-    speed: mp.boulderSpeed || SPD * 1.12, startBehind: 2.6,
+    speed: mp.boulderSpeed || SPD * 1.06, startBehind: 4.5,   // gentler + more head start (fair)
   }) : null;
   let boulderStarted = false;
   // STONE DOOR (L1-L4): a slab just past the exit cell's centre, lowering with the timer.
