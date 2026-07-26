@@ -287,6 +287,9 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
   let duckUntil = -1, doorCued = false;
   let pendTurn = null, pendAt = 0;   // buffered left/right tap (applied at the next junction)
   let turnSeenCell = null;           // junction cell already evaluated for the current pend (eval each once)
+  let lastTurnDir = null, lastTurnAt = -1;   // debounce accidental double-fire of the SAME turn
+  const TURN_DEBOUNCE_MS = 400;      // two of the same dir within this = a double-fire, not a real 2nd turn
+  const TURN_DBG = (() => { try { return new URLSearchParams(location.search).has('turndbg'); } catch { return false; } })();
   const DUCK_WINDOW = 480;                     // ms a duck press counts as "ducking" at the door
   let hop = 0, dip = 0, hopV = 0, dipV = 0;
   let sealShake = 0;   // decaying camera-shake pulse fired when the wall slams shut behind you
@@ -413,10 +416,20 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
       dipV = Math.max(dipV, PLAY.dipV); avatar.setAnim('duck'); audio.duck();
       if (hazards.judge('duck', p.x, p.z)) onClear();
     } else if (action === 'left' || action === 'right') {
-      // BUFFER the tap: apply now if the opening is already reachable, else hold it
-      // and retry each frame until the player reaches the junction (or it expires).
-      // A fresh tap overwrites the buffer, so you can change your mind.
-      pendTurn = action; pendAt = performance.now(); turnSeenCell = null;
+      // DEBOUNCE accidental double-fire of the SAME direction. Two identical turns within
+      // TURN_DEBOUNCE_MS is ALWAYS a stray double (key auto-repeat, double-tap, a duplicate
+      // listener) — never a real second turn, since the next junction is a whole cell (~1s)
+      // away. Left unguarded, the second press turns again at the NEXT junction → 90°+90° =
+      // a 180° "opposite" turn. This catches every source at the single input chokepoint.
+      const tnow = performance.now();
+      if (action === lastTurnDir && tnow - lastTurnAt < TURN_DEBOUNCE_MS) {
+        if (TURN_DBG) console.info('[turn] IGNORED double', action, Math.round(tnow - lastTurnAt) + 'ms');
+        return;
+      }
+      lastTurnDir = action; lastTurnAt = tnow;
+      // BUFFER the tap: applied at the next real junction (junction-scoped, see tryTurn).
+      pendTurn = action; pendAt = tnow; turnSeenCell = null;
+      if (TURN_DBG) { const c = nav.cell; console.info('[turn] press', action, 'at cell', c.r + ',' + c.c, 'heading', nav.heading, 'isJct', nav.isJunction()); }
       tryTurn();
       // If it couldn't turn AND the way ahead is a dead-end stub (no junction before
       // the wall), the player is heading the wrong way — prompt the U-turn control so
@@ -450,7 +463,9 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     const opes = nav.openings(cell.r, cell.c);
     const forwardOpen = opes.includes(nav.heading);
     const choice = opes.length >= 3, wasWall = nav.atWall;
+    const beforeH = nav.heading;
     if (nav.turn(pendTurn === 'left' ? 'L' : 'R')) {
+      if (TURN_DBG) console.info('[turn] TURNED', pendTurn, 'at cell', key, beforeH, '→', nav.heading, '(fwdOpen=' + forwardOpen + ')');
       pendTurn = null;                             // turned — consume the press here
       if (choice || wasWall || !forwardOpen) { onClear(); audio.turn(); }   // navigated a junction/corner
       else audio.turn();
