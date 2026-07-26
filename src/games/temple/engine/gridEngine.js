@@ -216,7 +216,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
   // the campaign's peak — a real prop you approach and physically take, replacing
   // the old text-cue-only climax. Grabbed on win() (see below).
   const relic = ENDING === 'artifact' ? createRelicProp({
-    THREE, scene, W: CELL, H, addLight,
+    THREE, scene, cam, W: CELL, H, addLight,
     pos: { x: exitWorld.x, z: exitWorld.z }, dirVec: approach,
   }) : null;
   // L5 CHAMBER SEAL: a stone slab that stays fully open until you take the gem,
