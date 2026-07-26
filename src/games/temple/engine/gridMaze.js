@@ -90,9 +90,11 @@ export function createGridNav(maze, { speed = 6, cellW = 10 } = {}) {
   // sides, then about-faces so you can always get out. Returns true if the heading changed.
   function turn(dir) {
     const want = dir === 'L' ? LEFT[heading] : RIGHT[heading];
-    // from a wall stop the runner pivots AT the cell centre (t=0) so the new
-    // corridor is entered cleanly; mid-stride turns keep t (cutting the corner).
-    if (openDir(r, c, want)) { heading = want; if (atWall || t >= 1) t = 0; atWall = false; return true; }
+    // ALWAYS pivot AT the cell centre (t=0). A side turn changes the interpolation
+    // axis, so carrying a non-zero t would re-anchor the runner along the new
+    // perpendicular direction — a diagonal position snap that reads as a U-turn/lurch.
+    // Resetting t makes every turn a clean pivot at the intersection centre.
+    if (openDir(r, c, want)) { heading = want; t = 0; atWall = false; return true; }
     if (atWall) {
       // at a wall/corner, ←/→ takes the OTHER open side if the pressed one is closed
       // (auto-corrects an L-turn). It does NOT fall back to reversing — turning back

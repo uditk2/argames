@@ -90,6 +90,20 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
   })();
   const TILED = SURF === 'tiled';
 
+  // DEV/QA: ?nocollapse=1 (localhost only) FREEZES the collapse countdown so a full
+  // clean run can be recorded for the preview video. The timer stays at full, the
+  // door stays open, and no false danger cues fire. Never active off localhost.
+  const NO_COLLAPSE = (() => {
+    try {
+      const h = location.hostname || '';
+      const local = h === 'localhost' || h === '127.0.0.1' || h === '[::1]'
+        || h.startsWith('192.168.') || h.startsWith('10.') || h.endsWith('.local');
+      const on = local && new URLSearchParams(location.search).has('nocollapse');
+      if (on) console.info('[Relic Hunter] ?nocollapse — collapse timer frozen (localhost debug)');
+      return on;
+    } catch { return false; }
+  })();
+
   const scene = new THREE.Scene();
   const ATMO = 0x0d0805;                       // near-black warm stone (never a hard void)
   renderer.setClearColor(ATMO, 1);
@@ -422,15 +436,13 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
   // buffer carries an early press across cells and fires at the FIRST opening it finds —
   // often an earlier junction than you meant (a "wrong turn"). Keeping it short means the
   // press only lands at the junction you're actually approaching; press again if you're early.
-  const TURN_AT_T = 0.62;        // don't turn until the runner is past the junction cell's
-  // centre — turning the instant you cross into the cell (t≈0) cuts the near corner and
-  // reads as "turning early". At a wall/corner we must turn immediately (no through-path).
+  // NOTE: no t-gate here. A buffered turn fires the frame you CROSS INTO a cell that has the
+  // opening — i.e. at t≈0, the junction cell's centre — which is exactly where the pivot
+  // should happen. (An earlier version waited for t>=0.62 and kept t, which re-anchored the
+  // runner 62% along the NEW perpendicular axis: a big diagonal snap that looked like a U-turn.)
   function tryTurn() {
     if (!pendTurn || phase !== 'run') { if (phase !== 'run') pendTurn = null; return; }
     if (performance.now() - pendAt > TURN_BUFFER_MS) { pendTurn = null; return; }
-    // Wait for the runner to reach the junction centre before pivoting (unless stopped at
-    // a wall). This keeps the buffered press alive and retries next frame.
-    if (!nav.atWall && nav.t < TURN_AT_T) return;
     const cell = nav.cell, wasWall = nav.atWall, before = nav.heading;
     const choice = nav.openings(cell.r, cell.c).length >= 3;   // a REAL decision point
     if (nav.turn(pendTurn === 'left' ? 'L' : 'R')) {
@@ -526,7 +538,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
       }
     }
     {
-      const ticking = (phase === 'run' && !falling) || phase === 'stuck';
+      const ticking = ((phase === 'run' && !falling) || phase === 'stuck') && !NO_COLLAPSE;
       if (collapse.tick(dt, ticking) && phase !== 'over' && phase !== 'won') {
         // NEAR-EXIT GRACE: expiring within reach of the exit counts as an escape.
         if (distExit() <= EXIT.timeGrace) win('BARELY!');
