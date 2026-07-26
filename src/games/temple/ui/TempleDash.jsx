@@ -49,8 +49,19 @@ import * as CG from '../crazygames/sdk.js';
 // provider is configured, so this is safe in every build.
 import { event } from '../../../analytics/index.js';
 import { isLocalHost } from '../../../analytics/host.js';
+// Throwaway in-app gameplay recorder (localhost + ?record=1 only). Captures the
+// game canvas to webm (no cursor, no OS chrome) and stashes it in IndexedDB; review
+// at /recordings.html. Kept as its own modules under ../recording/.
+import { createClipRecorder, isSupported as recSupported } from '../recording/clipRecorder.js';
+import clipStore from '../recording/clipStore.js';
 
 const IS_PHONE = typeof navigator !== 'undefined' && /Mobi|Android|iPhone|iPod/i.test(navigator.userAgent || '');
+// ?record=1 (localhost only) turns on the in-app clip recorder + its REC button / R key.
+const REC_ENABLED = (() => {
+  try { return isLocalHost() && new URLSearchParams(window.location.search).has('record') && recSupported(); }
+  catch { return false; }
+})();
+const fmtClock = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 // QA escape hatch (?nopause=1): disable the tab-hide/blur/rAF-stall HARD PAUSE so
 // automated playtests and capture rigs can drive the game without focus fights.
 // Normal players never see this; the auto-pause stays on by default.
@@ -112,6 +123,12 @@ export default function TempleDash({ onExit }) {
   // relished before the panel covers it. Set on the 'won' edge; reset per level.
   const [showWinPanel, setShowWinPanel] = useState(false);
   const winPanelTimer = useRef(null);
+  // --- throwaway clip recorder (localhost ?record=1) — see ../recording/* ---
+  const recorderRef = useRef(null);
+  const recToggleRef = useRef(null);
+  const recTimerRef = useRef(null);
+  const [recording, setRecording] = useState(false);
+  const [recElapsed, setRecElapsed] = useState(0);
   // Selected playable hunter (persisted in localStorage; the engine reads it at
   // avatar creation, so choosing on the wizard takes effect on the next run).
   const [character, setCharacterState] = useState(() => getSelectedCharacter().id);
@@ -170,6 +187,31 @@ export default function TempleDash({ onExit }) {
     if (pausedRef.current) return;   // no queued actions while hard-paused
     const e = engRef.current; if (e) e.input(action);
   }, []);
+
+  // Start/stop the throwaway clip recorder; on stop, stash the webm in IndexedDB
+  // (review at /recordings.html). No-op unless REC_ENABLED (localhost ?record=1).
+  const toggleRecord = useCallback(async () => {
+    if (!REC_ENABLED || !canvasRef.current) return;
+    const active = recorderRef.current && recorderRef.current.recording;
+    if (active) {
+      const clip = await recorderRef.current.stop();
+      recorderRef.current = null;
+      setRecording(false); setRecElapsed(0);
+      if (recTimerRef.current) { clearInterval(recTimerRef.current); recTimerRef.current = null; }
+      if (clip && clip.blob && clip.blob.size) {
+        try { const id = await clipStore.saveClip({ ...clip, level: levelIndex + 1 });
+          console.info('[rec] saved clip #' + id, Math.round(clip.durationMs / 1000) + 's', (clip.blob.size / 1e6).toFixed(1) + 'MB'); }
+        catch (err) { console.warn('[rec] save failed', err); }
+      }
+    } else {
+      recorderRef.current = createClipRecorder({ canvas: canvasRef.current, fps: 30 });
+      if (recorderRef.current.start()) {
+        setRecording(true); setRecElapsed(0);
+        recTimerRef.current = setInterval(() => setRecElapsed((s) => s + 1), 1000);
+      } else { recorderRef.current = null; }
+    }
+  }, [levelIndex]);
+  useEffect(() => { recToggleRef.current = toggleRecord; }, [toggleRecord]);
 
   // ONE attach point for the minimap <canvas> — used by BOTH the corner HUD map and
   // the study-phase map inside the reading overlay. Whichever canvas is mounted last
@@ -347,6 +389,7 @@ export default function TempleDash({ onExit }) {
       else if (k === 'ArrowLeft' || k === 'a') { e.preventDefault(); sendInput('left'); }
       else if (k === 'ArrowRight' || k === 'd') { e.preventDefault(); sendInput('right'); }
       else if (k === 'q') { e.preventDefault(); sendInput('uturn'); }   // Q = turn around (mid-corridor about-face)
+      else if (REC_ENABLED && k === 'r') { e.preventDefault(); recToggleRef.current && recToggleRef.current(); }   // R = start/stop recording
       else if (k === 'Shift' || k === 'Control') { e.preventDefault(); sendInput('runStart'); }   // RUN-TO-MOVE: hold either Shift or Ctrl (left/right) to run
       else if (k === 'm') { e.preventDefault(); setPeek(true); }   // HOLD M = pull the map to the front (mid-play, no freeze)
       else if (k === 'Enter') { e.preventDefault(); primaryActionRef.current && primaryActionRef.current(); }
@@ -519,6 +562,23 @@ export default function TempleDash({ onExit }) {
         <div className="font-display font-black text-lg bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">{BRAND.name}</div>
         <div className="text-[9px] tracking-[0.24em] uppercase" style={{ color: '#ffb454' }}>{BRAND.sub}</div>
       </div>
+
+      {/* THROWAWAY clip recorder controls (localhost ?record=1 only) */}
+      {REC_ENABLED && (
+        <div className="absolute bottom-3 left-4 z-[7] flex items-center gap-2 select-none">
+          <button onClick={toggleRecord}
+            className="px-3 py-1.5 rounded-lg text-[12px] font-bold flex items-center gap-2 border transition"
+            style={recording
+              ? { background: 'rgba(214,40,30,0.92)', color: '#fff', borderColor: '#ff6a52' }
+              : { background: 'rgba(20,14,8,0.72)', color: '#ffd99a', borderColor: '#ffb45455' }}>
+            <span style={{ width: 9, height: 9, borderRadius: 99, background: recording ? '#fff' : '#ff3b30', display: 'inline-block' }} />
+            {recording ? `STOP  ${fmtClock(recElapsed)}` : 'REC'}
+          </button>
+          <a href="/recordings.html" target="_blank" rel="noreferrer"
+            className="px-2.5 py-1.5 rounded-lg text-[11px] font-semibold border transition hover:brightness-125"
+            style={{ background: 'rgba(20,14,8,0.72)', color: '#c9a878', borderColor: '#ffb45433' }}>Clips ▸</a>
+        </div>
+      )}
 
       {screen === 'playing' && (
         <>
