@@ -337,6 +337,11 @@ export default function TempleDash({ onExit }) {
 
     const onKey = (e) => {
       const k = e.key.length === 1 ? e.key.toLowerCase() : e.key;   // normalize WASD/space
+      // IGNORE OS key auto-repeat for actions: a held/anticipated turn key must count as ONE
+      // press, else it re-queues the turn at every junction the runner passes (wrong turns).
+      // (Shift/Ctrl run-hold is intentionally exempt — it wants the held state.)
+      const isHold = k === 'Shift' || k === 'Control';
+      if (e.repeat && !isHold) { e.preventDefault(); return; }
       if (k === 'ArrowUp' || k === 'w' || k === ' ') { e.preventDefault(); sendInput('jump'); }
       else if (k === 'ArrowDown' || k === 's') { e.preventDefault(); sendInput('duck'); }
       else if (k === 'ArrowLeft' || k === 'a') { e.preventDefault(); sendInput('left'); }
