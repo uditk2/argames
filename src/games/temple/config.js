@@ -92,6 +92,15 @@ export const GRID = {
 // A/B comparison. The engine reads this default and the query param together.
 export const CORRIDOR_SURFACE = 'tip';
 
+// ---- BRAND -----------------------------------------------------------------
+// The game's title lockup — SINGLE source for the in-game wordmark (top-left HUD)
+// and anywhere else the name is shown. Renamed SlayFit -> Relic Hunter for the
+// portal relaunch; change here and every surface follows.
+export const BRAND = {
+  name: 'RELIC HUNTER',
+  sub: 'Temple Collapse',
+};
+
 // ---- AVATAR IDENTITY -------------------------------------------------------
 // The playable relic hunter's name + one-line identity, kept here as the SINGLE
 // source so copy (wizard, store listing, share card) reads from one place and the

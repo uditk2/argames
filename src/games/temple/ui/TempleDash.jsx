@@ -24,7 +24,7 @@
 // entirely here — the engine never sees it (it only reports phase/state).
 // ===========================================================================
 import React, { useRef, useState, useCallback, useEffect } from 'react';
-import { ASSETS, RUN_TO_MOVE, AVATAR_IDENTITY, CHARACTERS, getSelectedCharacter, setSelectedCharacter } from '../config.js';
+import { ASSETS, RUN_TO_MOVE, AVATAR_IDENTITY, BRAND, CHARACTERS, getSelectedCharacter, setSelectedCharacter } from '../config.js';
 import { assetUrl } from '../assetUrl.js';
 // GRID ENGINE (default): the 3D world, the navigation and the minimap are all
 // built from the SAME grid labyrinth, so every corridor the map shows is
@@ -511,8 +511,8 @@ export default function TempleDash({ onExit }) {
 
       {/* Brand */}
       <div className="absolute top-3.5 left-4 z-[5]">
-        <div className="font-display font-black text-lg bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">SLAYFIT</div>
-        <div className="text-[9px] tracking-[0.24em] uppercase" style={{ color: '#ffb454' }}>Temple Collapse</div>
+        <div className="font-display font-black text-lg bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">{BRAND.name}</div>
+        <div className="text-[9px] tracking-[0.24em] uppercase" style={{ color: '#ffb454' }}>{BRAND.sub}</div>
       </div>
 
       {screen === 'playing' && (
