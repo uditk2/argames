@@ -26,6 +26,7 @@
 import React, { useRef, useState, useCallback, useEffect } from 'react';
 import { ASSETS, RUN_TO_MOVE, AVATAR_IDENTITY, BRAND, CHARACTERS, getSelectedCharacter, setSelectedCharacter } from '../config.js';
 import { assetUrl } from '../assetUrl.js';
+import GemClaimFX from './GemClaimFX.jsx';
 // GRID ENGINE (default): the 3D world, the navigation and the minimap are all
 // built from the SAME grid labyrinth, so every corridor the map shows is
 // walkable — real junctions, real dead ends, multiple routes. The old linear
@@ -123,6 +124,8 @@ export default function TempleDash({ onExit }) {
   // relished before the panel covers it. Set on the 'won' edge; reset per level.
   const [showWinPanel, setShowWinPanel] = useState(false);
   const winPanelTimer = useRef(null);
+  // Divine-sunburst gem-claim FX — bump to fire it once (on the L5 gem grab).
+  const [gemFxKey, setGemFxKey] = useState(0);
   // --- throwaway clip recorder (localhost ?record=1) — see ../recording/* ---
   const recorderRef = useRef(null);
   const recToggleRef = useRef(null);
@@ -353,6 +356,7 @@ export default function TempleDash({ onExit }) {
           // Hold the panel: on L5 let the Syamantaka Gem lift play out (relish it),
           // a short settle elsewhere. isArtifact = the gem level (index 4).
           const isArtifact = idx === 4;
+          if (isArtifact) setGemFxKey((n) => n + 1);   // fire the Divine Sunburst on the gem grab
           if (winPanelTimer.current) clearTimeout(winPanelTimer.current);
           setShowWinPanel(false);
           winPanelTimer.current = setTimeout(() => setShowWinPanel(true), isArtifact ? 2600 : 350);
@@ -556,6 +560,8 @@ export default function TempleDash({ onExit }) {
       <canvas ref={canvasRef} className="absolute inset-0 w-full h-full block" />
       {/* 2D boulder / vignette overlay */}
       <canvas ref={fxRef} className="absolute inset-0 w-full h-full block pointer-events-none z-[3]" />
+      {/* Divine-sunburst gem-claim FX (screen-blended over the scene, fires on the L5 grab) */}
+      <GemClaimFX playKey={gemFxKey} />
 
       {/* Brand */}
       <div className="absolute top-3.5 left-4 z-[5]">
