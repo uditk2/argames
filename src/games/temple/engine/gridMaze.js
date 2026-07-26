@@ -95,11 +95,11 @@ export function createGridNav(maze, { speed = 6, cellW = 10 } = {}) {
     // perpendicular direction — a diagonal position snap that reads as a U-turn/lurch.
     // Resetting t makes every turn a clean pivot at the intersection centre.
     if (openDir(r, c, want)) { heading = want; t = 0; atWall = false; return true; }
-    if (atWall) {
-      // at a wall/corner, ←/→ takes the OTHER open side if the pressed one is closed
-      // (auto-corrects an L-turn). It does NOT fall back to reversing — turning back
-      // is the deliberate U-turn (Q / turnAround), so a dead end never reverses by
-      // accident on a turn key.
+    // pressed side closed. If we ALSO can't continue straight (a forced corner — whether
+    // we've reached the wall yet or not), take the OTHER open side so the turn lands at the
+    // junction centre instead of gliding into the wall first. This does NOT reverse — turning
+    // back is the deliberate U-turn (Q / turnAround), so a dead end never flips on a turn key.
+    if (atWall || !openDir(r, c, heading)) {
       const other = dir === 'L' ? RIGHT[heading] : LEFT[heading];
       if (openDir(r, c, other)) { heading = other; atWall = false; t = 0; return true; }
     }

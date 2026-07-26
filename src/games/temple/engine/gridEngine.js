@@ -286,6 +286,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
   let falling = false, fallT = 0;
   let duckUntil = -1, doorCued = false;
   let pendTurn = null, pendAt = 0;   // buffered left/right tap (applied at the next junction)
+  let turnSeenCell = null;           // junction cell already evaluated for the current pend (eval each once)
   const DUCK_WINDOW = 480;                     // ms a duck press counts as "ducking" at the door
   let hop = 0, dip = 0, hopV = 0, dipV = 0;
   let sealShake = 0;   // decaying camera-shake pulse fired when the wall slams shut behind you
@@ -415,7 +416,7 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
       // BUFFER the tap: apply now if the opening is already reachable, else hold it
       // and retry each frame until the player reaches the junction (or it expires).
       // A fresh tap overwrites the buffer, so you can change your mind.
-      pendTurn = action; pendAt = performance.now();
+      pendTurn = action; pendAt = performance.now(); turnSeenCell = null;
       tryTurn();
       // If it couldn't turn AND the way ahead is a dead-end stub (no junction before
       // the wall), the player is heading the wrong way — prompt the U-turn control so
@@ -432,27 +433,33 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
   }
 
   // buffered-turn state + resolver (see the left/right branch above)
-  const TURN_BUFFER_MS = 700;    // hold a ←/→ tap this long. SHORT on purpose: a long
-  // buffer carries an early press across cells and fires at the FIRST opening it finds —
-  // often an earlier junction than you meant (a "wrong turn"). Keeping it short means the
-  // press only lands at the junction you're actually approaching; press again if you're early.
-  // NOTE: no t-gate here. A buffered turn fires the frame you CROSS INTO a cell that has the
-  // opening — i.e. at t≈0, the junction cell's centre — which is exactly where the pivot
-  // should happen. (An earlier version waited for t>=0.62 and kept t, which re-anchored the
-  // runner 62% along the NEW perpendicular axis: a big diagonal snap that looked like a U-turn.)
+  // JUNCTION-SCOPED buffer. A ←/→ press is QUEUED and applied at the NEXT genuine decision
+  // point the runner reaches (a corner / 3- or 4-way — NOT every stray side opening), pivoting
+  // at that junction's centre. So you can press EARLY: the turn waits and lands on the junction
+  // ahead. It rides straight THROUGH junctions that don't offer your direction until it finds
+  // one that does (or the window lapses), and is consumed the moment it turns — it never carries
+  // on to surprise-turn you at a later junction.
+  const TURN_BUFFER_MS = 2500;   // generous — junction-scoping (below) is what bounds it, not time
   function tryTurn() {
     if (!pendTurn || phase !== 'run') { if (phase !== 'run') pendTurn = null; return; }
     if (performance.now() - pendAt > TURN_BUFFER_MS) { pendTurn = null; return; }
-    const cell = nav.cell, wasWall = nav.atWall, before = nav.heading;
-    const choice = nav.openings(cell.r, cell.c).length >= 3;   // a REAL decision point
+    if (!nav.isJunction()) return;                 // hold the press until a real decision point
+    const cell = nav.cell, key = cell.r + ',' + cell.c;
+    if (key === turnSeenCell) return;              // evaluate each junction cell only once
+    turnSeenCell = key;
+    const opes = nav.openings(cell.r, cell.c);
+    const forwardOpen = opes.includes(nav.heading);
+    const choice = opes.length >= 3, wasWall = nav.atWall;
     if (nav.turn(pendTurn === 'left' ? 'L' : 'R')) {
-      pendTurn = null;
-      const reversed = { N: 'S', S: 'N', E: 'W', W: 'E' }[before] === nav.heading;
-      if (reversed) { cue('DOUBLE BACK', '#ffd99a'); audio.back(); }
-      else if (choice || wasWall) { onClear(); audio.turn(); }   // navigated a junction
+      pendTurn = null;                             // turned — consume the press here
+      if (choice || wasWall || !forwardOpen) { onClear(); audio.turn(); }   // navigated a junction/corner
       else audio.turn();
       pushState();
+    } else if (!forwardOpen) {
+      pendTurn = null;                             // forced junction with no way to turn (dead end) — drop it
     }
+    // else: a straight-through junction that didn't offer this direction — keep the press
+    // queued so it rides on to the next junction that does.
   }
 
   // ---- minimap (live navigated cell + heading — matches free movement) ---------
