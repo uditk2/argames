@@ -23,6 +23,9 @@ export function createAvatarActor({ THREE, scene, ALIGN = { avatarScale: 1, avat
   const CHAR = character || getSelectedCharacter();
   const JUMP_LIFT = (CHAR && CHAR.jumpLift != null) ? CHAR.jumpLift : AVATAR.jumpLift;
   const DUCK_DROP = (CHAR && CHAR.duckDrop != null) ? CHAR.duckDrop : AVATAR.duckDrop;
+  // 'lift' anim (L5 gem claim): frames are taller (arms up) with this native aspect.
+  const LIFT_ASPECT = 368 / 1362;   // keep undistorted
+  const LIFT_BODY = 1.1;            // plane height vs AVATAR.height so her body matches the run size
   const sprite = makeSpriteSheets(THREE, CHAR && CHAR.sprites);
   const mat = new THREE.MeshBasicMaterial({ transparent: true, side: THREE.DoubleSide, depthWrite: false });
   // warm torch tint so the unlit sprite reads as lit by the temple (per-character).
@@ -73,6 +76,8 @@ export function createAvatarActor({ THREE, scene, ALIGN = { avatarScale: 1, avat
     if (moving || anim !== 'run') runT += dt * AVATAR.runFps;
     if (anim === 'run') {
       animFrame = Math.floor(runT) % sheet.count;
+    } else if (anim === 'lift') {
+      animFrame = Math.min(Math.floor(animT), sheet.count - 1);   // play once, HOLD the last frame (gem aloft)
     } else {
       animFrame = Math.floor(animT);
       if (animFrame >= sheet.count) { setAnim('run'); animFrame = 0; }
@@ -83,8 +88,20 @@ export function createAvatarActor({ THREE, scene, ALIGN = { avatarScale: 1, avat
     // ---- placement: feet on the floor, lift on jump / dip on duck -------------
     const lift = anim === 'jump' ? Math.sin(Math.min(1, animT / sheet.count) * Math.PI) * JUMP_LIFT : 0;
     const drop = anim === 'duck' ? Math.sin(Math.min(1, animT / sheet.count) * Math.PI) * DUCK_DROP : 0;
-    const footY = AVATAR.yOffset + (AVATAR.height * ALIGN.avatarScale) / 2 + ALIGN.avatarLift;
-    mesh.position.set(pos.x, footY + lift - drop, pos.z);
+    if (anim === 'lift') {
+      // The lift frames are TALLER (arms raised) with their own aspect. Scale the plane
+      // to that native aspect (no distortion) and to a height where her BODY matches the
+      // run size, then anchor her FEET on the floor (raised arms + gem extend up).
+      const sY = LIFT_BODY * ALIGN.avatarScale;
+      const sX = (LIFT_ASPECT / AVATAR.aspect) * sY;
+      mesh.scale.set(sX, sY, 1);
+      const worldH = AVATAR.height * sY;
+      mesh.position.set(pos.x, AVATAR.yOffset + worldH / 2 + ALIGN.avatarLift, pos.z);
+    } else {
+      mesh.scale.setScalar(ALIGN.avatarScale);
+      const footY = AVATAR.yOffset + (AVATAR.height * ALIGN.avatarScale) / 2 + ALIGN.avatarLift;
+      mesh.position.set(pos.x, footY + lift - drop, pos.z);
+    }
     mesh.quaternion.copy(camQuat);   // billboard: face the (un-rolled) camera
 
     // contact shadow: stays on the floor under the runner; shrinks + softens as
@@ -100,7 +117,7 @@ export function createAvatarActor({ THREE, scene, ALIGN = { avatarScale: 1, avat
       mesh.position.y -= fallY;
       mesh.quaternion.multiply(new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(1, 0, 0), fallP * 0.9));
       mat.opacity = Math.max(0, 1 - fallP * 1.05);
-    } else if (phase === 'won') {
+    } else if (phase === 'won' && anim !== 'lift') {
       mat.opacity = Math.max(0, 1 - Math.min(1, winT * 0.8));           // dissolve into the light
     } else if (phase === 'stuck') {
       const t = Math.min(1, stuckT * 1.4);
@@ -130,7 +147,7 @@ export function createAvatarActor({ THREE, scene, ALIGN = { avatarScale: 1, avat
     Object.values(sprite).forEach((sh) => sh.frames.forEach((t) => { try { t.dispose(); } catch { /* gone */ } }));
   }
 
-  return { setAnim, update, reset, dispose };
+  return { setAnim, update, reset, dispose, get hasLift() { return !!sprite.lift; } };
 }
 
 export default createAvatarActor;

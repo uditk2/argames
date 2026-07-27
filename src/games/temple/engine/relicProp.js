@@ -79,17 +79,18 @@ export function createRelicProp({ THREE, scene, cam, pos, dirVec, W, H, addLight
       glowMat.opacity = 0.28 * pulse;
       light.intensity = 2.4 * pulse;
     } else {
-      // grab: the jewel is LIFTED off the pedestal to chest height, swells with
-      // light, then HOLDS there (carried). The moment ends on the lift.
+      // grab: the pedestal jewel lifts a touch and FADES OUT — it's passing into the
+      // hunter's hands (the avatar's lift animation now shows her raising the gem aloft,
+      // so a second floating gem here would double it). The warm glow pool + light swell
+      // stay for radiance so the chamber blazes during the claim.
       grabT += dt;
-      const p = Math.min(1, grabT / GRAB_DUR);
-      const ease = p * p * (3 - 2 * p);
-      gem.position.y = GEM_Y0 + ease * LIFT_H;
-      const swell = Math.sin(Math.min(1, p) * Math.PI * 0.5);   // ramps up, holds high
-      gem.scale.setScalar(1 + swell * 0.35);
-      gemMat.opacity = 1;
+      const fade = Math.min(1, grabT / 0.5);
+      gem.position.y = GEM_Y0 + fade * (GEM_SIZE * 0.55);
+      gem.scale.setScalar(1 + fade * 0.2);
+      gemMat.opacity = 1 - fade;
+      const swell = Math.sin(Math.min(1, grabT / GRAB_DUR) * Math.PI * 0.5);
       glowMat.opacity = 0.3 + swell * 0.5;
-      glow.scale.setScalar(1 + swell * 0.8);
+      glow.scale.setScalar(1 + swell * 0.9);
       light.intensity = 2.4 + swell * 5.0;
       light.position.y = gem.position.y;
     }

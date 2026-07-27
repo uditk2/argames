@@ -26,7 +26,9 @@ export function makeSpriteSheets(THREE, sprites) {
     }
     return { frames, count: cfg.count };
   };
-  return { run: make(set.run), jump: make(set.jump), duck: make(set.duck) };
+  const sheets = { run: make(set.run), jump: make(set.jump), duck: make(set.duck) };
+  if (set.lift) sheets.lift = make(set.lift);   // optional: L5 gem-claim lift (per character)
+  return sheets;
 }
 
 export default makeSpriteSheets;

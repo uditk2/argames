@@ -184,6 +184,7 @@ export const CHARACTERS = {
       run:  { dir: assetUrl('assets/temple/char/mira/run'),  count: 19 },
       jump: { dir: assetUrl('assets/temple/char/mira/jump'), count: 24 },
       duck: { dir: assetUrl('assets/temple/char/mira/duck'), count: 24 },
+      lift: { dir: assetUrl('assets/temple/char/mira/lift'), count: 24 },   // L5 gem-claim: raises the gem aloft
     },
     // sprite already rises/crouches, so keep the engine lift small (just a touch of pop).
     jumpLift: 1.1, duckDrop: 0.5,

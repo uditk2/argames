@@ -367,7 +367,10 @@ export function createGridEngine({ canvas, fxCanvas, minimapCanvas, map, onCue, 
     cue('ENTOMBED', '#ff2e22'); pushState();
   }
   function win(text) {
-    phase = 'won'; winT = 0; avatar.setAnim('run');
+    phase = 'won'; winT = 0;
+    // L5 (artifact): play the hunter's LIFT animation — she raises the gem aloft, and it
+    // holds (no dissolve). Other levels keep the running/escape look.
+    avatar.setAnim(ENDING === 'artifact' && avatar.hasLift ? 'lift' : 'run');
     audio.ambient(false); (ENDING === 'artifact' ? audio.pickup() : audio.win());
     // L5: physically take the gem — fires the 0.6s slow-mo reach + light burst,
     // and flags the run so L6 shows the carried glow.
