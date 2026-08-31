@@ -18,3 +18,6 @@ dino-survival-media/
 grotto_tmp_*
 .trashbin/
 .claude/
+
+# CrazyGames upload artifact (built from dist-crazygames/, never committed)
+relic-hunter-crazygames.zip
