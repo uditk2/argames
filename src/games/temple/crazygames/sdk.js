@@ -50,28 +50,40 @@ function sdk() {
 
 let _initDone = false;
 let _initOk = false;
+let _initPromise = null;
+
+// Awaitable "the SDK has settled" — resolves true/false once init() has finished
+// (or immediately if it was never started). Callers that need post-init state,
+// e.g. game.settings, should await this instead of racing the fire-and-forget
+// initSdk() in the entry module.
+export function whenReady() {
+  return _initPromise || Promise.resolve(_initOk);
+}
 
 // --- init -------------------------------------------------------------------
 // Awaitable. Resolves once whether or not the SDK is present. On any host that
 // isn't CrazyGames the SDK throws / is absent — we swallow it and log the mode.
-export async function initSdk() {
-  if (!isEnabled()) { console.info('[CrazyGames] wrapper disabled — portal/local mode, SDK no-op.'); return false; }
-  if (_initDone) return _initOk;
+export function initSdk() {
+  if (!isEnabled()) { console.info('[CrazyGames] wrapper disabled — portal/local mode, SDK no-op.'); return Promise.resolve(false); }
+  if (_initDone) return _initPromise || Promise.resolve(_initOk);
   _initDone = true;
-  const s = sdk();
-  if (!s || typeof s.init !== 'function') {
-    console.info('[CrazyGames] SDK not present — running in absent/no-op mode (game unaffected).');
-    return false;
-  }
-  try {
-    await s.init();
-    _initOk = true;
-    console.info('[CrazyGames] SDK initialized (environment:', s.environment || 'unknown', ').');
-    return true;
-  } catch (e) {
-    console.info('[CrazyGames] SDK init failed — continuing in no-op mode.', e && e.message);
-    return false;
-  }
+  _initPromise = (async () => {
+    const s = sdk();
+    if (!s || typeof s.init !== 'function') {
+      console.info('[CrazyGames] SDK not present — running in absent/no-op mode (game unaffected).');
+      return false;
+    }
+    try {
+      await s.init();
+      _initOk = true;
+      console.info('[CrazyGames] SDK initialized (environment:', s.environment || 'unknown', ').');
+      return true;
+    } catch (e) {
+      console.info('[CrazyGames] SDK init failed — continuing in no-op mode.', e && e.message);
+      return false;
+    }
+  })();
+  return _initPromise;
 }
 
 // --- gameplay events --------------------------------------------------------
@@ -85,6 +97,35 @@ export function gameplayStart() {
 export function gameplayStop() {
   if (!isEnabled() || !_initOk) return;
   try { sdk()?.game?.gameplayStop?.(); } catch {}
+}
+
+// --- platform settings ------------------------------------------------------
+// The portal owns a global audio switch: `SDK.game.settings.muteAudio`. Per the
+// v3 Game-module docs the game MUST silence itself when it is true, and that
+// setting TAKES PRIORITY over the in-game mute toggle (an unmute in our own UI
+// must not override it). Both helpers are safe no-ops off-platform.
+//
+//   getSettings()            → { muteAudio: boolean } (empty object if absent)
+//   onSettingsChange(cb)     → unsubscribe function
+export function getSettings() {
+  if (!isEnabled() || !_initOk) return {};
+  try { return sdk()?.game?.settings || {}; } catch { return {}; }
+}
+export function onSettingsChange(cb) {
+  if (!isEnabled() || !_initOk) return () => {};
+  const g = sdk()?.game;
+  if (!g || typeof g.addSettingsChangeListener !== 'function') return () => {};
+  const listener = (s) => { try { cb(s || {}); } catch {} };
+  try { g.addSettingsChangeListener(listener); } catch { return () => {}; }
+  return () => { try { g.removeSettingsChangeListener?.(listener); } catch {} };
+}
+
+// --- celebration ------------------------------------------------------------
+// Portal-side confetti for a genuinely big moment (campaign complete). Docs say
+// to use it sparingly, so it is called exactly once per finished campaign.
+export function happytime() {
+  if (!isEnabled() || !_initOk) return;
+  try { sdk()?.game?.happytime?.(); } catch {}
 }
 
 // --- ads --------------------------------------------------------------------
@@ -127,4 +168,7 @@ export function rewardedAd(opts) {
   return requestAd('rewarded', opts);
 }
 
-export default { isEnabled, initSdk, gameplayStart, gameplayStop, midgameAd, rewardedAd };
+export default {
+  isEnabled, initSdk, whenReady, gameplayStart, gameplayStop, midgameAd, rewardedAd,
+  getSettings, onSettingsChange, happytime,
+};

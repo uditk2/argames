@@ -77,8 +77,16 @@ const START_LIVES = 3;
 // present yet or autoplay is blocked, so the game is fully playable without VO.
 const VO_LANG = (() => { try { return (navigator.language || 'en').toLowerCase().startsWith('hi') ? 'hi' : 'en'; } catch { return 'en'; } })();
 let _voAudio = null;
+// VO plays through its own <audio> element, NOT the engine's Web Audio master
+// gain — so it has to be silenced separately whenever the game is muted (player
+// toggle, the CrazyGames muteAudio setting, or a video ad). See setAudioMuted().
+let _voMuted = false;
+function setVOMuted(v) {
+  _voMuted = !!v;
+  if (_voAudio) { try { _voAudio.muted = _voMuted; } catch { /* ignore */ } }
+}
 function playVO(key) {
-  if (!key) return;
+  if (!key || _voMuted) return;
   try {
     if (_voAudio) { try { _voAudio.pause(); } catch { /* ignore */ } _voAudio = null; }
     const a = new Audio(assetUrl(`assets/temple/vo/${VO_LANG}/${key}.mp3`));
@@ -109,7 +117,56 @@ export default function TempleDash({ onExit }) {
   const [paused, setPaused] = useState(false);
   const pausedRef = useRef(false);
   const beginRunRef = useRef(null);
+  // ---- AUDIO MUTE POLICY -----------------------------------------------------
+  // Three independent reasons the game can be silent; the effective state is the
+  // OR of all three, re-applied to the engine (Web Audio master gain) and to the
+  // VO <audio> element whenever any of them changes:
+  //   muted         — the player's own 🔊 toggle.
+  //   platformMuted — CrazyGames `SDK.game.settings.muteAudio`. Per the v3 Game
+  //                   docs this TAKES PRIORITY: the in-game toggle must not be
+  //                   able to unmute while the portal says mute.
+  //   adMutedRef    — a video ad is on screen. The Ads requirements say to mute
+  //                   when the ad actually starts (adStarted) and unmute when it
+  //                   finishes — not for the whole request window.
   const [muted, setMuted] = useState(false);
+  const [platformMuted, setPlatformMuted] = useState(false);
+  const mutedRef = useRef(false);
+  const platformMutedRef = useRef(false);
+  const adMutedRef = useRef(false);
+  const applyMute = useCallback(() => {
+    const eff = mutedRef.current || platformMutedRef.current || adMutedRef.current;
+    const e = engRef.current; if (e) e.setMuted(eff);
+    setVOMuted(eff);
+    return eff;
+  }, []);
+  // Player toggle. Ignored while the portal setting forces mute (docs: the SDK
+  // setting takes priority over in-game audio settings).
+  const toggleMute = useCallback(() => {
+    if (platformMutedRef.current) return;
+    mutedRef.current = !mutedRef.current;
+    setMuted(mutedRef.current);
+    applyMute();
+  }, [applyMute]);
+  // Mute/unmute around a video ad. Paired: onStart → true, onStop → false.
+  const setAdMuted = useCallback((v) => { adMutedRef.current = !!v; applyMute(); }, [applyMute]);
+  // Follow the portal's global audio switch. SDK init is async and fired from
+  // the entry module, so wait for it to settle before reading settings /
+  // subscribing — otherwise both are no-ops and we'd miss the initial value.
+  // Entirely no-op off-platform (whenReady resolves immediately).
+  useEffect(() => {
+    let alive = true, unsubscribe = null;
+    const adopt = (s) => {
+      platformMutedRef.current = !!(s && s.muteAudio);
+      setPlatformMuted(platformMutedRef.current);
+      applyMute();
+    };
+    CG.whenReady().then(() => {
+      if (!alive) return;
+      adopt(CG.getSettings());
+      unsubscribe = CG.onSettingsChange(adopt);
+    });
+    return () => { alive = false; if (unsubscribe) unsubscribe(); };
+  }, [applyMute]);
   const [wizStep, setWizStep] = useState(0);   // onboarding wizard step (0..WIZ_STEPS-1)
   const readTimerRef = useRef(null);
   const [cue, setCue] = useState(null);              // { text, color, id }
@@ -347,7 +404,10 @@ export default function TempleDash({ onExit }) {
           // record best time + stars for this level (time left on the clock vs budget).
           const budget = (engRef.current && engRef.current.budgetS) || 0;
           const res = progress.recordClear(idx, st.timeLeft != null ? st.timeLeft : 0, budget);
-          if (last) progress.recordVictory();
+          if (last) {
+            progress.recordVictory();
+            CG.happytime();   // portal confetti — once per finished campaign only
+          }
           setLastResult(res);
           refreshProgress();
           // Hold the panel: on L5 let the Syamantaka Gem lift play out (relish it),
@@ -365,6 +425,10 @@ export default function TempleDash({ onExit }) {
       },
     });
     engRef.current = eng;
+    // Every level builds a FRESH engine (and a fresh audio graph), which starts
+    // unmuted — so re-apply the mute policy here or the player's toggle (and the
+    // portal's muteAudio setting) silently reset on each level.
+    applyMute();
 
     const onResize = () => eng.resize();
     window.addEventListener('resize', onResize); window.__templeResize = onResize;
@@ -416,7 +480,7 @@ export default function TempleDash({ onExit }) {
         if (left <= 0) { beginRun(); } else setReading({ secs: left });
       }, 1000);
     }
-  }, [teardown, flashCue, sendInput, beginRun, pauseGame, refreshProgress]);
+  }, [teardown, flashCue, sendInput, beginRun, pauseGame, refreshProgress, applyMute]);
 
   // Start the campaign fresh: full lives, level 0, revive available again.
   const startCampaign = useCallback((fromIdx = 0) => {
@@ -467,7 +531,10 @@ export default function TempleDash({ onExit }) {
     if (reviving || reviveUsed) return;
     setReviving(true);
     event('temple_revive_started', { level: levelIndex + 1 });
-    const r = await CG.rewardedAd({});
+    // Mute only while the video is actually on screen (adStarted → adFinished /
+    // adError), per the CrazyGames ad requirements. The button is disabled for
+    // the whole request window via `reviving`, so play can't progress meanwhile.
+    const r = await CG.rewardedAd({ onStart: () => setAdMuted(true), onStop: () => setAdMuted(false) });
     setReviving(false);
     if (r && r.shown) {
       event('temple_revive_watched', { level: levelIndex + 1 });
@@ -505,9 +572,10 @@ export default function TempleDash({ onExit }) {
     // transition. gameplayStop() already fired on the 'won' edge, so no active
     // play is interrupted. Awaitable + resolves even on adError/adblock, so the
     // next level always loads. Guarded no-op off-platform → instant on the portal.
-    await CG.midgameAd();
+    // Muted for the duration of the video itself (adStarted → adFinished/adError).
+    await CG.midgameAd({ onStart: () => setAdMuted(true), onStop: () => setAdMuted(false) });
     loadLevel(next);          // KEEP current lives
-  }, [levelIndex, loadLevel]);
+  }, [levelIndex, loadLevel, setAdMuted]);
 
   const restartCampaign = useCallback(() => startCampaign(0), [startCampaign]);
 
@@ -654,13 +722,15 @@ export default function TempleDash({ onExit }) {
             </div>
           )}
 
-          {/* MUTE toggle */}
+          {/* MUTE toggle. Disabled while the CrazyGames muteAudio setting is on —
+              that setting takes priority and the game must not unmute past it. */}
           {!ended && (
-            <button onClick={() => { const e = engRef.current; if (e) setMuted(e.toggleMuted()); }}
+            <button onClick={toggleMute} disabled={platformMuted}
               className="absolute bottom-3 left-3 z-[6] pointer-events-auto w-9 h-9 rounded-lg flex items-center justify-center active:scale-95 transition"
-              style={{ background: 'rgba(28,19,11,0.7)', border: '1px solid #ffb45444', textShadow: '0 1px 3px #000' }}
-              aria-label={muted ? 'Unmute' : 'Mute'}>
-              <span style={{ fontSize: 16 }}>{muted ? '🔇' : '🔊'}</span>
+              style={{ background: 'rgba(28,19,11,0.7)', border: '1px solid #ffb45444', textShadow: '0 1px 3px #000',
+                opacity: platformMuted ? 0.45 : 1, cursor: platformMuted ? 'default' : 'pointer' }}
+              aria-label={platformMuted ? 'Muted by CrazyGames' : (muted ? 'Unmute' : 'Mute')}>
+              <span style={{ fontSize: 16 }}>{(muted || platformMuted) ? '🔇' : '🔊'}</span>
             </button>
           )}
 
@@ -693,7 +763,7 @@ export default function TempleDash({ onExit }) {
               at the top, then study the route, then GO. Start of level only. */}
           {reading && (
             <div className="absolute inset-0 z-[20] flex flex-col items-center justify-between py-7"
-              style={{ background: 'rgba(6,4,2,0.74)' }}>
+              style={{ background: 'rgba(6,4,2,0.74)', paddingBottom: 'calc(1.75rem + 56px)' }}>
               <div className="text-center px-4 w-full">
                 <div className="text-[11px] font-black uppercase tracking-[0.22em] mb-1.5" style={{ color: '#ffb454' }}>
                   Level {levelIndex + 1} of 6 · {levelName}
@@ -798,36 +868,50 @@ export default function TempleDash({ onExit }) {
           hook, and PLAY drops straight into L1's study screen (which is gameplay).
           Controls are taught just-in-time in-run. */}
       {screen === 'intro' && (
+        // SHORT-VIEWPORT SAFETY. CrazyGames serves the game in iframes as small as
+        // 821x462 (desktop, non-fullscreen) and 800x450 (mobile) at DPR 1. This panel
+        // is taller than that, and it used to overflow with no scroll, so the ▶ Play
+        // button landed BELOW the fold — a new player had no way to start, an instant
+        // QA fail on "land users in gameplay in max 1 click".
+        // Fix: cap the panel to the viewport (minus a gutter for the fixed consent
+        // banner), let the STORY block scroll, and keep the CTA pinned as a footer so
+        // it is on-screen and hit-testable at every documented size.
         <div className="absolute inset-0 z-[20] flex items-center justify-center p-4">
           <div className="absolute inset-0" aria-hidden="true"
             style={{ backgroundImage: `url(${assetUrl('assets/temple/corridor_dark.webp')})`, backgroundSize: 'cover', backgroundPosition: 'center', filter: 'brightness(0.34) saturate(0.95)' }} />
           <div className="absolute inset-0" aria-hidden="true"
             style={{ background: 'radial-gradient(circle at 50% 38%, rgba(30,19,9,0.25), rgba(6,4,2,0.9))' }} />
-          <div className="panel w-[min(94vw,440px)] text-center overflow-hidden relative z-[1]" style={{ padding: 0 }}>
-            <div className="pt-5 px-6">
+          <div className="panel w-[min(94vw,440px)] text-center overflow-hidden relative z-[1] flex flex-col"
+            style={{ padding: 0, maxHeight: 'calc(100% - 56px)' }}>
+            <div className="pt-5 px-6 shrink-0">
               <div className="font-display font-black text-[26px] leading-none bg-gradient-to-b from-[var(--brand-grad-1)] to-[var(--brand-grad-2)] bg-clip-text text-transparent">RELIC HUNTER</div>
               <div className="text-[10px] font-semibold uppercase tracking-[0.2em] mt-1.5" style={{ color: '#ffb454' }}>Temple Collapse</div>
             </div>
 
-            {/* ANIMATED HERO — the chosen hunter running the torch-lit corridor. */}
-            <div className="relative mx-auto mt-3" style={{ height: 176, overflow: 'hidden' }}>
-              <div className="absolute inset-0" aria-hidden="true"
-                style={{ backgroundImage: `url(${assetUrl('assets/temple/corridor_bright.webp')})`, backgroundSize: 'cover', backgroundPosition: 'center 30%', filter: 'brightness(0.72)' }} />
-              <div className="absolute inset-0" aria-hidden="true"
-                style={{ background: 'linear-gradient(180deg, rgba(20,12,6,0.5) 0%, rgba(20,12,6,0) 25%, rgba(20,12,6,0.65) 100%)' }} />
-              <SpriteRunner character={character} />
+            {/* STORY BLOCK — hero + premise + hunter pick. The only part allowed to
+                scroll, so a short viewport never pushes the CTA off-screen. */}
+            <div className="flex-1 min-h-0 overflow-y-auto">
+              {/* ANIMATED HERO — the chosen hunter running the torch-lit corridor.
+                  Shrinks with the viewport so it yields space instead of scrolling. */}
+              <div className="relative mx-auto mt-3" style={{ height: 'clamp(84px, 24vh, 176px)', overflow: 'hidden' }}>
+                <div className="absolute inset-0" aria-hidden="true"
+                  style={{ backgroundImage: `url(${assetUrl('assets/temple/corridor_bright.webp')})`, backgroundSize: 'cover', backgroundPosition: 'center 30%', filter: 'brightness(0.72)' }} />
+                <div className="absolute inset-0" aria-hidden="true"
+                  style={{ background: 'linear-gradient(180deg, rgba(20,12,6,0.5) 0%, rgba(20,12,6,0) 25%, rgba(20,12,6,0.65) 100%)' }} />
+                <SpriteRunner character={character} />
+              </div>
+
+              <div className="px-6 pt-3">
+                <p className="text-[13px] italic leading-snug" style={{ color: '#e8c79a' }}>
+                  “Surya's Syamantaka Gem. Krishna won it; the sea took it with Dwaraka. Now it's sealed in this temple — and you're the relic hunter come to bring it back, for all of us.”
+                </p>
+                <VOButton k="premise" />
+                <CharacterPicker selected={character} onPick={pickCharacter} />
+              </div>
             </div>
 
-            <div className="px-6 pt-3">
-              <p className="text-[13px] italic leading-snug" style={{ color: '#e8c79a' }}>
-                “Surya's Syamantaka Gem. Krishna won it; the sea took it with Dwaraka. Now it's sealed in this temple — and you're the relic hunter come to bring it back, for all of us.”
-              </p>
-              <VOButton k="premise" />
-              <CharacterPicker selected={character} onPick={pickCharacter} />
-            </div>
-
-            {/* PLAY — one click to gameplay. */}
-            <div className="px-6 py-5 flex flex-col gap-2">
+            {/* PLAY — one click to gameplay. Pinned: never scrolls out of reach. */}
+            <div className="px-6 py-5 flex flex-col gap-2 shrink-0">
               <button onClick={() => startCampaign(0)}
                 className="w-full py-3.5 rounded-xl font-black text-white text-lg bg-gradient-to-r from-fire to-magic shadow-glow-fire hover:brightness-110 transition">
                 ▶ {summary.furthest > 0 ? 'New run' : 'Play'}
