@@ -39,8 +39,15 @@ rename step is needed any more.
    `store-assets/crazygames/`:
    - Covers: `landscape_1920x1080.png`, `portrait_800x1200.png`, `square_800x800.png`
      (all three carry the RELIC HUNTER wordmark and match the in-game brand).
-   - Preview videos: `store-assets/crazygames/videos/*_1080p.mp4` — 18 s each, landscape
-     1920×1080 and portrait 1080×1620, ~8.5 MB (limit 50 MB).
+   - Preview videos: `store-assets/crazygames/videos/relic-hunter_preview_*.mp4` —
+     landscape 1920×1080 (17.3 s, 26 MB) and portrait 1080×1620 (17.7 s, 18 MB).
+     Both open on the matching static cover, then cut to a real recorded L5 run
+     ending on the Syamantaka gem claim. No audio track, no cursor, no black bars,
+     no fast-forward, no promo text — captured headless at the target aspect so the
+     game genuinely fills the portrait frame rather than being letterboxed.
+     The earlier `temple-collapse_preview_*` pair is in `videos/superseded/`: shot
+     2026-07-02, before the rename and the art pass, and it shows the old avatar and
+     a visible mouse cursor (explicitly disallowed).
    - Screenshots: `store-assets/crazygames/screenshots/` (6).
    - Note: the older `store-assets/crazygames/covers/temple-collapse_cover_*.png` set is
      superseded by `marketing/crazygames/` — upload the marketing set.
