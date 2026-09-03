@@ -40,7 +40,7 @@ rename step is needed any more.
    - Covers: `landscape_1920x1080.png`, `portrait_800x1200.png`, `square_800x800.png`
      (all three carry the RELIC HUNTER wordmark and match the in-game brand).
    - Preview videos: `store-assets/crazygames/videos/relic-hunter_preview_*.mp4` —
-     landscape 1920×1080 (17.3 s, 26 MB) and portrait 1080×1620 (17.7 s, 18 MB).
+     landscape 1920×1080 (18.1 s, 26 MB) and portrait 1080×1620 (17.8 s, 18 MB).
      Both open on the matching static cover, then cut to a real recorded L5 run
      ending on the Syamantaka gem claim. No audio track, no cursor, no black bars,
      no fast-forward, no promo text — captured headless at the target aspect so the
