@@ -44,7 +44,7 @@ const TEMPLE_FLAT = [
   // ~1/10th the bytes, visually identical). Keeps the initial download small.
   'boulder_hero.webp', 'corridor_bright.webp', 'corridor_dark.webp', 'crack_floor.webp',
   'doorway_panel.webp', 'exit_light.webp', 'fire_jet_sheet.webp', 'gem_hero.webp',
-  'life_full.webp', 'life_lost.webp', 'lion_head.webp', 'map_frame.webp',
+  'lion_head.webp', 'map_frame.webp',
   'obs_beam.webp', 'obs_blade_head.webp', 'stone_door.webp', 'tex_floor.webp',
   'tex_wall.webp',
   // Gem-claim sunburst clip (GemClaimFX plays webm, falls back to mp4).
