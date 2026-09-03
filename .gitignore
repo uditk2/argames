@@ -21,3 +21,6 @@ grotto_tmp_*
 
 # CrazyGames upload artifact (built from dist-crazygames/, never committed)
 relic-hunter-crazygames.zip
+
+# macOS cruft
+.DS_Store
