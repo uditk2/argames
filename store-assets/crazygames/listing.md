@@ -1,67 +1,86 @@
-# Temple Collapse — CrazyGames Store Listing (paste-ready)
+# Relic Hunter — CrazyGames Store Listing (paste-ready)
 
-Fill these into the CrazyGames Developer Portal submission form. Each block is written to drop straight into the matching field. Copy that needs your choice is marked **[pick one]**.
+Drop each block straight into the matching field in the CrazyGames Developer Portal.
+
+**Rewritten 2026-09-04** against the shipped build. The previous version described
+"Temple Collapse: Maze Escape", 3 levels, an idol, and `A · D` turning — all of that
+predates the rename, the six-trial campaign, the Syamantaka Gem and the Mira/Vikram
+character select. Everything below matches what actually ships in `dist-crazygames/`.
 
 ---
 
 ## Game title
 
-**Temple Collapse: Maze Escape**
+**Relic Hunter: Temple Collapse**
 
-*(Alt if a shorter title is needed: `Temple Collapse`)*
+*(Shorter alt if the field is tight: `Relic Hunter`. The in-game wordmark reads
+RELIC HUNTER with TEMPLE COLLAPSE as the sub-line, so either matches the covers.)*
 
 ---
 
 ## Short description / tagline
 *(one line — used in previews and search)*
 
-> Sprint through a crumbling temple, read the map, and take the right turns to the exit before it all comes down.
+> Lift the Syamantaka Gem, then outrun the temple you just brought down.
 
 ---
 
 ## Long description
-*(the main game page description — SEO-friendly, mentions genre + keywords naturally)*
 
-Temple Collapse is a fast, good-looking 3D maze runner set inside an ancient temple that's falling apart around you. You've grabbed the idol — now the ceiling is coming down, the floor is cracking, and the only way out is forward. Sprint down torch-lit stone corridors, glance at the minimap, and pick the right turn at every junction to find the exit before the collapse timer hits zero.
+Relic Hunter is a 3D temple maze runner. You play Mira or Vikram, a relic hunter
+after the Syamantaka — Surya's sun-gem, which blesses a worthy keeper and ruins an
+unworthy taker. Six trials stand between you and it, and the temple starts coming
+down the moment you take it.
 
-It's not just running. Jump the fallen beams, low fire jets, and floor gaps. Duck the swinging blades and high flame bursts. Read the maze and commit — a wrong turn is a dead end you have to back out of, and the temple won't wait. Clear all three levels on a shared pool of lives, and see how deep you can get before the temple keeps you for good.
+Every trial is a real labyrinth, not a corridor. You get a few seconds to study the
+map before each run, then you commit: turn the right way at every junction while the
+collapse timer burns down. Wrong turns cost time, dead ends make you back out, and
+the temple does not wait. Hold M mid-run to steal another look at the map.
 
-With photoreal temple environments, a real treasure-hunter hero, and tight, forgiving controls, Temple Collapse is easy to pick up and hard to put down. Play free in your browser — no download, no install.
+Between you and the exit: swinging blades to duck, fallen stone beams to jump,
+cracked floors that give way, and guardian lion heads that spit fire. The game
+teaches one input at a time — blades first, then jumps — so you are never guessing.
+Three lives carry across the whole campaign. Take the gem on the fifth trial, then
+run for daylight on the sixth with the temple collapsing behind you.
+
+Photoreal torch-lit stone, a proper folklore premise, and controls that take one
+second to learn. Free in your browser, no download, no install.
 
 ---
 
 ## How to play / Controls
-*(CrazyGames shows this as the "Controls" field — keep it short and scannable)*
 
 **Desktop**
-- **Arrow keys / A · D** — turn left or right at junctions
-- **↑ / W / Space** — jump (beams, fire jets, floor gaps)
+- **← / →** or **A / D** — turn left or right at junctions
+- **↑ / W / Space** — jump (fallen beams, cracked floor, low fire)
 - **↓ / S** — duck (swinging blades, high fire)
-- **Enter** — confirm / retry on menus
+- **Q** — turn around when you hit a dead end
+- **Hold M** — peek at the map mid-run
+- **Enter** — confirm on menus
 
 **Mobile**
 - **Swipe ← / →** — turn
 - **Swipe ↑ or tap** — jump
 - **Swipe ↓** — duck
 
-Read the minimap (top-right), take the right turns, dodge the traps, and reach the exit before the temple collapses.
+Study the map, take the right turns, dodge the traps, and reach the exit before the
+collapse timer runs out.
 
 ---
 
 ## Features
-*(optional bullet block if the form allows extra copy / for your own reference)*
 
-- Photoreal 3D temple maze runner — runs free in the browser
-- Read-the-map navigation: real junctions, real dead ends
-- Jump-and-duck trap gauntlet: beams, blades, fire jets, collapsing floors
-- A collapse timer that keeps every run tense
-- 3 handcrafted levels, shared-lives campaign
-- One-tap pick-up-and-play controls, desktop and mobile
+- Six-trial campaign with three shared lives — memorise the maze, beat the clock
+- Real labyrinths: multiple routes, genuine dead ends, a map you actually read
+- Blades to duck, beams and gaps to jump, fire-spitting guardians, collapsing floors
+- Two playable hunters (Mira and Vikram)
+- A folklore premise drawn from the Syamantaka legend, narrated in-game
+- Stars and best times per trial, so a cleared run is worth re-running
+- Instant browser play, desktop and mobile
 
 ---
 
 ## Tags
-*(choose from CrazyGames' tag taxonomy — these all exist on the platform)*
 
 Primary: **3D**, **Runner**, **Maze**, **Adventure**, **Action**
 
@@ -71,13 +90,15 @@ Secondary: **Escape**, **Arcade**, **Skill**, **Temple**
 
 ## Category
 
-**[pick one]** Adventure  ·  Action  — *recommend listing under Adventure with Runner/3D as the leading tags (best discovery fit for a temple-escape runner).*
+**Adventure**, with Runner / 3D as the leading tags — best discovery fit for a
+temple-escape runner. (Action is the reasonable second choice.)
 
 ---
 
 ## Age rating
 
-Content is mild — cartoonish peril (crushing, fire, blades) with **no blood, gore, or realistic violence**. Fits comfortably within CrazyGames' **PEGI 12** baseline; select **PEGI 12** (their default minimum) unless the form offers a lower tier you prefer.
+Mild peril only — blades, fire and collapsing stone, with no blood, gore or
+realistic violence. Sits comfortably inside CrazyGames' **PEGI 12** baseline.
 
 ---
 
@@ -89,7 +110,16 @@ Content is mild — cartoonish peril (crushing, fire, blades) with **no blood, g
 
 ## Notes for the submission (not pasted into fields)
 
-- **Covers still needed:** CrazyGames requires 3 cover images — **landscape, portrait, and square** — plus a short preview video, with consistent art across all three. That's the separate "asset brief" step (say the word and I'll spec exact dimensions + generation prompts).
-- **Exclusivity:** to get the +50% revenue share, opt into the ~2-month launch exclusivity in the deal settings.
-- **Land-in-gameplay:** Full Launch requires players land directly in gameplay — your standalone build already opens straight to the Temple Collapse intro with a single "▶ Play," which satisfies this.
-- **Rating source:** confirm the exact PEGI selector in the portal; wording above matches PEGI 12 content descriptors.
+- **Do NOT paste the site SEO copy.** `src/config/seo-routes.js` ends with links to
+  Keeper and Dino Survival; CrazyGames prohibits cross-promotion of other games in a
+  listing. The copy above is deliberately free of it.
+- **Assets to upload** — covers `marketing/crazygames/{landscape_1920x1080,
+  portrait_800x1200,square_800x800}.png`; videos
+  `store-assets/crazygames/videos/relic-hunter_preview_{landscape,portrait_2x3}_1080p.mp4`;
+  screenshots `store-assets/crazygames/screenshots/` (6).
+- **Build** — `relic-hunter-crazygames.zip` from `npm run build:crazygames`, 25 MB,
+  `index.html` at the zip root.
+- **Exclusivity** — the higher revenue share requires opting into launch exclusivity
+  in the deal settings. Decline it if you intend to publish on other portals too.
+- **Land-in-gameplay** — satisfied: the standalone opens on the intro with a single
+  ▶ Play.
