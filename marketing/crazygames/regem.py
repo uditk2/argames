@@ -22,10 +22,12 @@ GEM = Image.open('public/assets/temple/gem_hero.webp').convert('RGB')
 
 # center + radii tuned per cover (see the blue-blob detection that found them)
 COVERS = {
-    'marketing/crazygames/landscape_1920x1080.png': dict(cx=1595, cy=472, erase=105, gem=310, glow=270),
-    'marketing/crazygames/portrait_800x1200.png':   dict(cx=559,  cy=478, erase=95,  gem=280, glow=245),
-    'marketing/crazygames/square_800x800.png':      dict(cx=600,  cy=332, erase=100, gem=295, glow=255),
-    'marketing/crazygames/og-cover_1200x630.png':   dict(cx=994,  cy=291, erase=62,  gem=180, glow=155),
+    'marketing/crazygames/landscape_1920x1080.png': dict(cx=1595, cy=472, erase=105, dbr=510, gx=1595, gy=500, gsize=300, gglow=260),
+    # the jewel must clear the TEMPLE COLLAPSE sub-line, so it sits lower than the
+    # emoji it replaces (and further right on portrait, to stay off the hunter).
+    'marketing/crazygames/portrait_800x1200.png':   dict(cx=559,  cy=478, erase=95,  dbr=465, gx=628, gy=548, gsize=235, gglow=200),
+    'marketing/crazygames/square_800x800.png':      dict(cx=600,  cy=332, erase=100, dbr=485, gx=600, gy=395, gsize=255, gglow=215),
+    'marketing/crazygames/og-cover_1200x630.png':   dict(cx=994,  cy=291, erase=62,  dbr=295, gx=996, gy=330, gsize=165, gglow=140),
 }
 
 
@@ -127,9 +129,9 @@ def compose(im, cx, cy, gem_px, glow_px):
 
 for path, c in COVERS.items():
     im = Image.open(path).convert('RGB')
-    deblue(im, c['cx'], c['cy'], int(c['glow'] * 1.9))
+    deblue(im, c['cx'], c['cy'], c['dbr'])
     erase(im, c['cx'], c['cy'], c['erase'])
-    im = compose(im, c['cx'], c['cy'], c['gem'], c['glow'])
+    im = compose(im, c['gx'], c['gy'], c['gsize'], c['gglow'])
     out = path.replace('.png', '_NEW.png')
     im.save(out)
     print('wrote', out)
