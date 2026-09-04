@@ -3,12 +3,13 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "SlayFit — a webcam workout brawler (MediaPipe pose + PixiJS).",
+  "description": "SlayFit \u2014 a webcam workout brawler (MediaPipe pose + PixiJS).",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node scripts/prerender-routes.mjs",
     "build:crazygames": "vite build --config vite.crazygames.config.js",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "build:portable": "vite build --config vite.portable.config.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^0.10.4",
