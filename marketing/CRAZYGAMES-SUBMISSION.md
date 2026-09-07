@@ -18,27 +18,39 @@ Output: `dist-crazygames/` — `index.html` + `assets/`, all paths relative. The
 its own size report and **hard-fails if a listed asset is missing** (see
 `vite.crazygames.config.js`), so a stale asset list can no longer ship as silent 404s.
 
-Zip the **contents** of `dist-crazygames/` (not the folder itself — `index.html` must sit at
-the zip root):
+**Do NOT zip it.** The portal's upload zone rejects archives outright:
+
+> Archive files are not supported, please drag and drop the files directly in the upload zone.
+
+Instead, open `dist-crazygames/`, select all five top-level entries — `index.html`,
+`privacy.html`, `favicon.svg`, `favicon.ico` and the `assets/` folder — and drag them into
+the "Upload files" box on step 1 of the submit wizard. Chrome preserves the directory
+structure on drag-and-drop, which matters: the game loads everything from `./assets/...`.
 
 ```bash
-cd dist-crazygames && zip -qr ../relic-hunter-crazygames.zip . && cd ..
+open dist-crazygames        # then drag the contents into the browser
 ```
 
 The build renames Vite's `crazygames.html` output to `index.html` automatically, so no manual
-rename step is needed any more.
+rename step is needed.
 
 ## Manual portal steps (cannot be automated)
 
 1. **Register / sign in** at https://developer.crazygames.com.
 2. **Create the game** → "Add game" → HTML5. Name: *Relic Hunter* (subtitle *Temple Collapse*).
    Category: Adventure / Runner. Tags: runner, 3D, maze, temple, adventure.
-3. **Upload the build**: `relic-hunter-crazygames.zip`. The portal unzips and serves it in a
-   QA iframe. Confirm it loads to the ▶ Play intro.
+3. **Upload the build**: drag the contents of `dist-crazygames/` in (see above — no zip).
+   The portal serves it in a QA iframe. Confirm it loads to the ▶ Play intro.
 4. **Covers / screenshots / video** — ready under `marketing/crazygames/` and
    `store-assets/crazygames/`:
    - Covers: `landscape_1920x1080.png`, `portrait_800x1200.png`, `square_800x800.png`
      (all three carry the RELIC HUNTER wordmark and match the in-game brand).
+     All three are positioned clear of the **label-badge corner** — the portal's crop
+     dialog draws a warning box over roughly the top-left third, and the title must not
+     sit under it. The square was rebuilt for this (`square_twoline.py`): its wordmark
+     used to be a single line running edge to edge, with both R's sliced by the frame,
+     sitting squarely in that corner. It now carries the portrait's intact two-line
+     RELIC / HUNTER block, and the gem moved down to clear the sub-line.
    - Preview videos: `store-assets/crazygames/videos/relic-hunter_preview_*.mp4` —
      landscape 1920×1080 (18.1 s, 26 MB) and portrait 1080×1620 (17.8 s, 18 MB).
      Both open on the matching static cover, then cut to a real recorded L5 run
@@ -139,9 +151,10 @@ no 4xx/5xx.
   ~3 MB with no audible loss on a background loop), `gem_claim.webm` 1.2 MB +
   `gem_claim.mp4` 1.1 MB (both kept for codec coverage), then the wall/floor textures.
   Getting under 20 MB needs the music re-encode **and** a texture pass.
-- ⚠️ **Cover art review** — the blue gem on the covers reads as a generic stock/emoji icon
-  against the photoreal art. Cover guidelines ask for consistent visuals and no store/app
-  icons; worth redrawing before upload.
+- ✅ **Cover art review** — the blue stock emoji that used to stand in for the relic is
+  gone; all four covers now carry the game's own Syamantaka sun-jewel
+  (`public/assets/temple/gem_hero.webp`), so the cover and the level-5 payoff show the
+  same object. See `regem.py` and `square_twoline.py`, both committed alongside the PNGs.
 - ✅ **Refresh-rate consistency** — the frame loop is delta-timed
   (`dt = Math.min(50, rawMs) / 1000`) and every sim step integrates `dt`, so 144/165 Hz
   monitors run the same pacing. (Camera smoothing uses `Math.min(1, dt*k)` lerps, which
